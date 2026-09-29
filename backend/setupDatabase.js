@@ -57,6 +57,16 @@ const sqlScript = `
       FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE CASCADE,
       UNIQUE(producto_id, temporada)
   );
+
+
+CREATE TABLE IF NOT EXISTS usuarios (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    rol TEXT CHECK(rol IN ('ADMIN', 'SUPRA')) NOT NULL DEFAULT 'ADMIN',
+    creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `;
 
 // Ejecución del script

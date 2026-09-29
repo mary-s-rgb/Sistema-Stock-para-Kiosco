@@ -1,0 +1,106 @@
+.register-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 100vh;
+    width: 100vw;
+    background: radial-gradient(circle at 70% 50%, #20cded 0%, #0c6280 40%, #032238 85%);
+    padding: 0 8%;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    overflow: hidden;
+}
+
+.register-left-section {
+    display: flex;
+    flex-direction: column;
+    width: 320px;
+}
+
+.register-header-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #ffffff;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    margin-bottom: 15px;
+}
+
+.register-card {
+    background-color: #ffffff;
+    border-radius: 16px;
+    padding: 30px 25px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+}
+
+.register-input,
+.register-select {
+    width: 100%;
+    padding: 12px 15px;
+    margin-bottom: 15px;
+    background-color: #d1d8df;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.95rem;
+    color: #1a1a1a;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.register-input::placeholder {
+    color: #333333;
+}
+
+.register-submit-btn {
+    background-color: #4ee3ff;
+    color: #000000;
+    border: none;
+    border-radius: 20px;
+    padding: 8px 30px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    align-self: center;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+    transition: transform 0.1s ease, background-color 0.2s ease;
+    margin-top: 10px;
+}
+
+.register-submit-btn:hover {
+    background-color: #2ecbe7;
+    transform: translateY(-1px);
+}
+
+.back-to-login-btn {
+    background: none;
+    border: none;
+    color: #ffffff;
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    margin-top: 25px;
+    text-align: center;
+    cursor: pointer;
+}
+
+.back-to-login-btn:hover {
+    text-decoration: underline;
+}
+
+.register-right-section {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.brand-logo-img {
+    max-width: 380px;
+    width: 100%;
+    height: auto;
+    filter: drop-shadow(2px 6px 16px rgb(243, 239, 239));
+    user-select: none;
+}
