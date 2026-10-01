@@ -3,10 +3,11 @@ import Login from './pages/login';
 import Register from './pages/register';
 import Dashboard from './pages/Dashboard';
 
-// Guardián para proteger la vista privada del Dashboard
+
+// Componente guardián para proteger rutas
 function ProtectedRoute({ children }) {
-  const token = localStorage.getItem('token');
-  return token ? children : <Navigate to="/login" />;
+const token = localStorage.getItem('token');
+return token ? children : <Navigate to="/login" />;
 }
 
 export default function App() {
