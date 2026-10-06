@@ -52,3 +52,29 @@ El sistema utiliza una base de datos relacional integrada con las siguientes ent
 * **`Proveedores`** (Información de contacto y tiempos de entrega)
 * **`Atributos_Estacionales`** (Límites de reorden específicos por temporada)
 * **`Movimientos`** (Historial de entradas y salidas de mercadería)
+
+## 🚀 Cómo ejecutar la aplicación
+
+Una vez clonado el repositorio, debés iniciar el frontend y el backend en terminales separadas:
+
+### 1. Backend
+
+Navegá a la carpeta `backend`, instalá las dependencias (si es la primera vez) e iniciá el servidor:
+
+```bash
+cd backend
+npm install
+node server.js
+```
+El servidor quedará corriendo en http://localhost:3001
+
+### 2. Frontend
+
+Navegá a la carpeta `frontend`, instalá las dependencias (si es la primera vez) e iniciá el servidor:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+La aplicación estará accesible en la URL http://localhost:5173
