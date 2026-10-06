@@ -131,15 +131,51 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 2rem;
+  padding: 0;
 }
 
 /* Tamaño del logo */
 .brand-logo-img {
   width: 100%;
-  max-width: 500px;
+  max-width: 700px;
   height: auto;
   filter:
     drop-shadow(0px 0px 8px rgba(88, 222, 255, 0.912)) drop-shadow(0px 0px 20px rgba(32, 205, 237, 0.6)) drop-shadow(0px 10px 15px rgba(0, 0, 0, 0.4));
   transition: transform 0.3s ease, filter 0.3s ease;
+}
+
+/* Contenedor del input con el botón del ojo */
+.password-input-wrapper {
+  position: relative;
+  width: 100%;
+  margin-bottom: 18px;
+}
+
+/* Quitar margen inferior al input interno porque ya lo maneja el wrapper */
+.password-input-wrapper .login-input {
+  margin-bottom: 0;
+  padding-right: 40px;
+  /* Espacio para que el texto no tape el ícono */
+}
+
+/* Botón transparente para conmutar la visibilidad */
+.toggle-password-btn {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  outline: none;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.toggle-password-btn:hover {
+  opacity: 1;
 }
