@@ -8,9 +8,11 @@ const path = require('path');
 const app = express();
 const PORT = 3001;
 const SECRET_KEY = 'clave_secreta_kiosco';
+const recoverPasswordRoutes = require('./recover-password');
 
 app.use(cors());
 app.use(express.json());
+app.use('/api', recoverPasswordRoutes(db));
 
 const db = new sqlite3.Database(
   path.resolve(__dirname, 'kiosco.db')
