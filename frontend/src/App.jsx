@@ -1,34 +1,40 @@
+// Ejemplo de cómo quedará tu App.jsx al añadir la ruta de recuperación:
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/login';
 import Register from './pages/register';
-import Dashboard from './pages/Dashboard';
+import Dashboard from './pages/dashboard';
+import RecoverPassword from './pages/recover-password';
+import AdminUser from './pages/adminUser';
 
-
-// Componente guardián para proteger rutas
 function ProtectedRoute({ children }) {
-const token = localStorage.getItem('token');
-return token ? children : <Navigate to="/login" />;
+  const token = localStorage.getItem('token');
+  return token ? children : <Navigate to="/login" />;
 }
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Redirección inicial a /login */}
         <Route path="/" element={<Navigate to="/login" replace />} />
-        
-        {/* Rutas Públicas */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        {/* <Route path="/recover-password" element={<RecoverPassword />} /> */}
         
-        {/* Ruta Privada */}
         <Route path="/dashboard" element={
           <ProtectedRoute>
             <Dashboard />
           </ProtectedRoute>
         } />
+
+        <Route path="/recover-password" element={<RecoverPassword />} />
+
+        <Route path="/admin/users" element={
+            <ProtectedRoute>
+              <AdminUser />
+            </ProtectedRoute>
+          } />
+
       </Routes>
     </BrowserRouter>
   );
 }
-

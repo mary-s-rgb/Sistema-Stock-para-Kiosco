@@ -8,15 +8,22 @@ const path = require('path');
 const app = express();
 const PORT = 3001;
 const SECRET_KEY = 'clave_secreta_kiosco';
-const recoverPasswordRoutes = require('./recover-password');
 
 app.use(cors());
 app.use(express.json());
-app.use('/api', recoverPasswordRoutes(db));
 
+// 1. PRIMERO: Inicializamos la conexión a la base de datos SQLite
 const db = new sqlite3.Database(
-  path.resolve(__dirname, 'kiosco.db')
+  path.resolve(__dirname, 'kiosco.db'),
+  (err) => {
+    if (err) console.error('Error al conectar con la base de datos:', err.message);
+    else console.log('Conectado a la base de datos kiosco.db');
+  }
 );
+
+// 2. SEGUNDO: Importamos y montamos las rutas modulares (pasando 'db' correctamente ya inicializada)
+const recoverPasswordRoutes = require('./recover-password');
+app.use('/api', recoverPasswordRoutes(db));
 
 // Endpoint 1: Registro de Usuarios
 app.post('/api/register', async (req, res) => {

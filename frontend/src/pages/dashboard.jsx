@@ -1,33 +1,47 @@
 import { useNavigate } from 'react-router-dom';
+import './';
 
 export default function Dashboard() {
-    // 1. Inicializar el hook de navegación dentro del componente
-    const navigate = useNavigate();
+  const navigate = useNavigate();
+  const storedUser = JSON.parse(localStorage.getItem('usuario') || '{}');
 
-    const handleLogout = () => {
-        // 2. Limpiar credenciales y estado global de autenticación
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');  
-       
-        // 3. Redirigir hacia la vista de login
-        navigate('/login');
-    }; 
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('usuario');  
+    navigate('/login');
+  }; 
 
-    // (Opcional) Si manejas peticiones fetch/axios y quieres interceptar el 401 aquí:
-    // const checkResponse = (response) => {
-    //     if (response.status === 401) {
-    //         handleLogout();
-    //     }
-    // };
-
-    return (
-        <div>
-            <h1>Vista dashboard</h1>
-            
-            {/* El botón debe estar dentro del JSX que retorna el componente */}
-            <button onClick={handleLogout} className="btn-logout">
-                Cerrar sesión
-            </button>
+  return (
+    <div className="dashboard-container">
+      <nav className="dashboard-navbar">
+        <div className="navbar-brand">
+          <h3>Kiosco App</h3>
         </div>
-    );
+        <div className="navbar-user">
+          <span>Hola, <strong>{storedUser.nombre || 'Administrador'}</strong> ({storedUser.rol})</span>
+          <button onClick={handleLogout} className="btn-logout">
+            Cerrar Sesión
+          </button>
+        </div>
+      </nav>
+
+      <main className="dashboard-content">
+        <div className="dashboard-card">
+          <h2>Panel Principal</h2>
+          <p>Bienvenido al sistema de gestión y control de stock.</p>
+          
+          {storedUser.rol === 'SUPRA' && (
+            <div className="admin-shortcut">
+              <button 
+                onClick={() => navigate('/admin/users')} 
+                className="btn-admin-shortcut"
+              >
+                Gestionar Usuarios (SUPRA)
+              </button>
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  );
 }
