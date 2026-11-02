@@ -144,3 +144,146 @@ app.delete('/api/users/:id', verifySupraRole, (req, res) => {
 app.listen(PORT, () => {
   console.log(`Servidor Backend corriendo en http://localhost:${PORT}`);
 });
+// === MÓDULO DE PRODUCTOS ===
+
+// 1. Obtener todos los productos
+app.get('/api/products', (req, res) => {
+  const query = 'SELECT * FROM productos';
+
+  db.all(query, [], (err, rows) => {
+    if (err) {
+      return res.status(500).json({
+        message: 'Error al obtener productos'
+      });
+    }
+
+    res.json(rows);
+  });
+});
+
+// 2. Añadir un nuevo producto (SCRUM-51)
+app.post('/api/products', (req, res) => {
+  const {
+    categoria,
+    nombre,
+    codigo_barras,
+    estacion,
+    observacion,
+    stock
+  } = req.body;
+
+  if (!nombre || !codigo_barras) {
+    return res.status(400).json({
+      message: 'El nombre y el código de barras son obligatorios'
+    });
+  }
+
+  const query = `
+    INSERT INTO productos (
+      categoria,
+      nombre,
+      codigo_barras,
+      estacion,
+      observacion,
+      stock
+    )
+    VALUES (?, ?, ?, ?, ?, ?)
+  `;
+
+  db.run(
+    query,
+    [
+      categoria,
+      nombre,
+      codigo_barras,
+      estacion,
+      observacion,
+      stock || 0
+    ],
+    function (err) {
+      if (err) {
+        if (err.message.includes('UNIQUE constraint failed')) {
+          return res.status(400).json({
+            message: 'El código de barras ya está registrado'
+          });
+        }
+
+        return res.status(500).json({
+          message: 'Error al guardar el producto'
+        });
+      }
+
+      res.status(201).json({
+        id: this.lastID,
+        message: 'Producto creado con éxito'
+      });
+    }
+  );
+});
+
+// 3. Actualizar un producto
+app.put('/api/products/:id', (req, res) => {
+  const { id } = req.params;
+
+  const {
+    categoria,
+    nombre,
+    codigo_barras,
+    estacion,
+    observacion,
+    stock
+  } = req.body;
+
+  const query = `
+    UPDATE productos
+    SET categoria = ?,
+        nombre = ?,
+        codigo_barras = ?,
+        estacion = ?,
+        observacion = ?,
+        stock = ?
+    WHERE id = ?
+  `;
+
+  db.run(
+    query,
+    [
+      categoria,
+      nombre,
+      codigo_barras,
+      estacion,
+      observacion,
+      stock,
+      id
+    ],
+    function (err) {
+      if (err) {
+        return res.status(500).json({
+          message: 'Error al actualizar el producto'
+        });
+      }
+
+      res.json({
+        message: 'Producto actualizado correctamente'
+      });
+    }
+  );
+});
+
+// 4. Eliminar un producto
+app.delete('/api/products/:id', (req, res) => {
+  const { id } = req.params;
+  const query = 'DELETE FROM productos WHERE id = ?';
+
+  db.run(query, [id], function (err) {
+    if (err) {
+      return res.status(500).json({
+        message: 'Error al eliminar el producto'
+      });
+    }
+
+    res.json({
+      message: 'Producto eliminado correctamente'
+    });
+  });
+});
