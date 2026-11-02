@@ -38,3 +38,6 @@ export default function App() {
     </BrowserRouter>
   );
 }
+import Products from './pages/products' ; 
+// Dentro de tus <Routes> 
+< Route path = "/products" element = { < Products />} />
