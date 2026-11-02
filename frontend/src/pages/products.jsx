@@ -19,8 +19,7 @@ const navigate = useNavigate();
 
 // Cargar productos al iniciar 
 useEffect( () => { 
- fetchProducts(); 
-}, []); 
+
 const fetchProducts = async () => { 
  try { 
   const res = await fetch( 'http://localhost:3001/api/products' ); 
