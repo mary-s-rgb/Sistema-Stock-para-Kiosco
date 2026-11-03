@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import './Login.css';
+import '../estilos/login.css';
 import logoKiosco from '../assets/logo-kiosco.png';
 
 export default function Login() {

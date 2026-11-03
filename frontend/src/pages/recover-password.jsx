@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import "./recover-password.css";
+import "../estilos/recover-password.css";
 
 export default function RecoverPassword() {
   const [email, setEmail] = useState('');

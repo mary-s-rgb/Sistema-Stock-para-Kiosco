@@ -1,9 +1,14 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import './dashboard.css';
+import Products from '../components/productos';
+import '../estilos/dashboard.css';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const storedUser = JSON.parse(localStorage.getItem('usuario') || '{}');
+
+  // Estado para controlar qué sección se muestra en el panel derecho
+  const [activeSection, setActiveSection] = useState('welcome');
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -13,27 +18,26 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard-container">
-      {/* Tarjeta principal contenedora */}
       <div className="dashboard-main-card">
         
-        {/* Barra lateral (Sidebar) idéntica al diseño de referencia */}
+        {/* Barra lateral (Sidebar) turquesa */}
         <aside className="dashboard-sidebar">
           <div className="sidebar-section">
             <h3>PRODUCTOS</h3>
-            <a href="#categorias" className="sidebar-link">Categorías</a>
-            <a href="#buscador" className="sidebar-link">Buscador (filtro)</a>
+            <button onClick={() => setActiveSection('products-add')} className="sidebar-link-btn">Añadir nueva</button>
+            <button onClick={() => setActiveSection('products-search')} className="sidebar-link-btn">Buscador (filtro)</button>
           </div>
 
           <div className="sidebar-section">
             <h3>PROVEEDORES</h3>
-            <a href="#prov-cat" className="sidebar-link">Categorías</a>
-            <a href="#prov-busc" className="sidebar-link">Buscador (filtro)</a>
+            <button onClick={() => setActiveSection('suppliers-cat')} className="sidebar-link-btn">Categorías</button>
+            <button onClick={() => setActiveSection('suppliers-search')} className="sidebar-link-btn">Buscador (filtro)</button>
           </div>
 
           <div className="sidebar-section">
             <h3>HISTORIAL</h3>
-            <a href="#mensual" className="sidebar-link">Mensual</a>
-            <a href="#anual" className="sidebar-link">Anual</a>
+            <button onClick={() => setActiveSection('history-monthly')} className="sidebar-link-btn">Mensual</button>
+            <button onClick={() => setActiveSection('history-annual')} className="sidebar-link-btn">Anual</button>
           </div>
 
           <button onClick={handleLogout} className="btn-logout-app">
@@ -41,31 +45,52 @@ export default function Dashboard() {
           </button>
         </aside>
 
-        {/* Área de contenido principal a la derecha */}
+        {/* Área de contenido principal dinámica a la derecha */}
         <main className="dashboard-content-area">
-          <div className="dashboard-header-title">
-            Panel Principal
+          <div className="dashboard-header-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>Panel Principal</span>
+            <span style={{ fontSize: '14px', fontWeight: 'normal', color: '#555' }}>
+              Hola, {storedUser.nombre || 'Usuario'} ({storedUser.rol})
+            </span>
           </div>
-          
-          <div className="dashboard-card-inner">
-            <h2>Bienvenido, {storedUser.nombre || 'Administrador'}</h2>
-            <p>Rol actual: <strong>{storedUser.rol}</strong></p>
-            <p>Utiliza el menú lateral para navegar por el sistema de gestión y control de stock.</p>
-            
-            {/* Si el usuario es SUPRA, mostramos el acceso directo al panel de usuarios */}
-            {storedUser.rol === 'SUPRA' && (
-              <div className="admin-shortcut">
-                <button 
-                  onClick={() => navigate('/admin/users')} 
-                  className="btn-admin-shortcut"
-                >
-                  Gestionar Usuarios (SUPRA)
-                </button>
-              </div>
-            )}
-          </div>
-        </main>
 
+          {/* VISTA 1: BIENVENIDA */}
+          {activeSection === 'welcome' && (
+            <div className="dashboard-card-inner">
+              <h2>Bienvenido al sistema de control de stock</h2>
+              <p>Utiliza el menú lateral turquesa para navegar entre las opciones de Productos, Proveedores e Historial.</p>
+              
+              {storedUser.rol === 'SUPRA' && (
+                <div className="admin-shortcut" style={{ marginTop: '20px' }}>
+                  <button onClick={() => navigate('/admin/users')} className="btn-admin-shortcut">
+                    Gestionar Usuarios (SUPRA)
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* RENDERIZADO DEL MÓDULO DE PRODUCTOS */}
+          {activeSection.startsWith('products') && (
+            <Products activeSection={activeSection} />
+          )}
+
+          {/* OTRAS SECCIONES PLACEHOLDER */}
+          {activeSection.startsWith('suppliers') && (
+            <div className="dashboard-card-inner">
+              <h3>Módulo de Proveedores</h3>
+              <p>Sección en desarrollo según el diseño de categorías y buscadores.</p>
+            </div>
+          )}
+
+          {activeSection.startsWith('history') && (
+            <div className="dashboard-card-inner">
+              <h3>Historial de Ventas ({activeSection.includes('monthly') ? 'Mensual' : 'Anual'})</h3>
+              <p>Reportes de movimientos y transacciones registradas.</p>
+            </div>
+          )}
+
+        </main>
       </div>
     </div>
   );

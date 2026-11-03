@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
-import "./adminUser.css";
+import "../estilos/adminUser.css";
 
 export default function AdminUsers() {
   const [users, setUsers] = useState([]);

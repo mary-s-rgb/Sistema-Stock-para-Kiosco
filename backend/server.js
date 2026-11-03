@@ -141,133 +141,127 @@ app.delete('/api/users/:id', verifySupraRole, (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Servidor Backend corriendo en http://localhost:${PORT}`);
-});
-// === MÓDULO DE PRODUCTOS ===
-
-// 1. Obtener todos los productos
-app.get('/api/products', (req, res) => {
-  const query = 'SELECT * FROM productos';
-
-  db.all(query, [], (err, rows) => {
+// Endpoint para obtener todas las categorías
+app.get('/api/categorias', (req, res) => {
+  db.all('SELECT * FROM categorias', [], (err, rows) => {
     if (err) {
-      return res.status(500).json({
-        message: 'Error al obtener productos'
-      });
+      return res.status(500).json({ message: 'Error al obtener categorías' });
     }
-
     res.json(rows);
   });
 });
 
-// 2. Añadir un nuevo producto (SCRUM-51)
-app.post('/api/products', (req, res) => {
-  const {
-    categoria,
-    nombre,
-    codigo_barras,
-    estacion,
-    observacion,
-    stock
-  } = req.body;
+// ==> COLÓCALO AQUÍ ARRIBA (Antes de app.listen) <==
+app.get('/api/proveedores', (req, res) => {
+  db.all('SELECT * FROM proveedores', [], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ message: 'Error al obtener proveedores' });
+    }
+    res.json(rows);
+  });
+});
 
-  if (!nombre || !codigo_barras) {
-    return res.status(400).json({
-      message: 'El nombre y el código de barras son obligatorios'
-    });
-  }
+app.listen(PORT, () => {
+  console.log(`Servidor Backend corriendo en http://localhost:${PORT}`);
+});
+// === MÓDULO DE PRODUCTOS CORREGIDO ===
 
+// 1. Obtener todos los productos (trayendo el stock actual mediante un LEFT JOIN)
+app.get('/api/products', (req, res) => {
   const query = `
-    INSERT INTO productos (
-      categoria,
-      nombre,
-      codigo_barras,
-      estacion,
-      observacion,
-      stock
-    )
-    VALUES (?, ?, ?, ?, ?, ?)
+    SELECT p.*, c.nombre AS categoria_nombre, COALESCE(s.cantidad_actual, 0) AS stock 
+    FROM productos p
+    LEFT JOIN categorias c ON p.categoria_id = c.id
+    LEFT JOIN stock s ON p.id = s.producto_id
   `;
 
-  db.run(
-    query,
-    [
-      categoria,
-      nombre,
-      codigo_barras,
-      estacion,
-      observacion,
-      stock || 0
-    ],
-    function (err) {
-      if (err) {
-        if (err.message.includes('UNIQUE constraint failed')) {
-          return res.status(400).json({
-            message: 'El código de barras ya está registrado'
-          });
-        }
+  db.all(query, [], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ message: 'Error al obtener productos' });
+    }
+    res.json(rows);
+  });
+});
 
-        return res.status(500).json({
-          message: 'Error al guardar el producto'
-        });
+// 2. Añadir un nuevo producto 
+app.post('/api/products', (req, res) => {
+  const { codigo_barras, nombre, precio_costo, precio_venta, categoria_id, proveedor_id, temporada_alta, stock } = req.body;
+
+  if (!nombre || !codigo_barras) {
+    return res.status(400).json({ message: 'El nombre y el código de barras son obligatorios' });
+  }
+
+  db.serialize(() => {
+    db.run('BEGIN TRANSACTION;');
+
+    const queryProd = `
+      INSERT INTO productos (codigo_barras, nombre, precio_costo, precio_venta, categoria_id, proveedor_id, temporada_alta)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    db.run(queryProd, [codigo_barras, nombre, precio_costo || 0, precio_venta || 0, categoria_id || null, proveedor_id || null, temporada_alta || 'TODA_TEMP'], function (err) {
+      if (err) {
+        db.run('ROLLBACK;');
+        if (err.message.includes('UNIQUE constraint failed')) {
+          return res.status(400).json({ message: 'El código de barras ya está registrado' });
+        }
+        return res.status(500).json({ message: 'Error al guardar el producto' });
       }
 
-      res.status(201).json({
-        id: this.lastID,
-        message: 'Producto creado con éxito'
+      const prodId = this.lastID;
+      const queryStock = `INSERT INTO stock (producto_id, cantidad_actual) VALUES (?, ?)`;
+
+      db.run(queryStock, [prodId, stock || 0], (errStock) => {
+        if (errStock) {
+          db.run('ROLLBACK;');
+          return res.status(500).json({ message: 'Error al registrar el stock inicial' });
+        }
+
+        db.run('COMMIT;', () => {
+          res.status(201).json({ id: prodId, message: 'Producto creado con éxito' });
+        });
       });
-    }
-  );
+    });
+  });
 });
 
 // 3. Actualizar un producto
 app.put('/api/products/:id', (req, res) => {
   const { id } = req.params;
+  const { codigo_barras, nombre, precio_costo, precio_venta, categoria_id, proveedor_id, temporada_alta, stock } = req.body;
 
-  const {
-    categoria,
-    nombre,
-    codigo_barras,
-    estacion,
-    observacion,
-    stock
-  } = req.body;
+  db.serialize(() => {
+    db.run('BEGIN TRANSACTION;');
 
-  const query = `
-    UPDATE productos
-    SET categoria = ?,
-        nombre = ?,
-        codigo_barras = ?,
-        estacion = ?,
-        observacion = ?,
-        stock = ?
-    WHERE id = ?
-  `;
+    const queryProd = `
+      UPDATE productos
+      SET codigo_barras = ?, nombre = ?, precio_costo = ?, precio_venta = ?, categoria_id = ?, proveedor_id = ?, temporada_alta = ?
+      WHERE id = ?
+    `;
 
-  db.run(
-    query,
-    [
-      categoria,
-      nombre,
-      codigo_barras,
-      estacion,
-      observacion,
-      stock,
-      id
-    ],
-    function (err) {
+    db.run(queryProd, [codigo_barras, nombre, precio_costo, precio_venta, categoria_id, proveedor_id, temporada_alta, id], (err) => {
       if (err) {
-        return res.status(500).json({
-          message: 'Error al actualizar el producto'
-        });
+        db.run('ROLLBACK;');
+        return res.status(500).json({ message: 'Error al actualizar el producto' });
       }
 
-      res.json({
-        message: 'Producto actualizado correctamente'
+      const queryStock = `
+        INSERT INTO stock (producto_id, cantidad_actual) VALUES (?, ?)
+        ON CONFLICT(producto_id) DO UPDATE SET cantidad_actual = ?
+      `;
+
+      db.run(queryStock, [id, stock || 0, stock || 0], (errStock) => {
+        if (errStock) {
+          db.run('ROLLBACK;');
+          return res.status(500).json({ message: 'Error al actualizar el stock' });
+        }
+
+        db.run('COMMIT;', () => {
+          res.json({ message: 'Producto actualizado correctamente' });
+        });
       });
-    }
-  );
+    });
+  });
 });
 
 // 4. Eliminar un producto
@@ -277,13 +271,8 @@ app.delete('/api/products/:id', (req, res) => {
 
   db.run(query, [id], function (err) {
     if (err) {
-      return res.status(500).json({
-        message: 'Error al eliminar el producto'
-      });
+      return res.status(500).json({ message: 'Error al eliminar el producto' });
     }
-
-    res.json({
-      message: 'Producto eliminado correctamente'
-    });
+    res.json({ message: 'Producto eliminado correctamente' });
   });
 });

@@ -1,0 +1,283 @@
+/* Asegurar que la raíz y el body no generen desbordamientos laterales */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  width: 100%;
+}
+
+/* Contenedor principal perfectamente centrado */
+.dashboard-container {
+  min-height: 100vh;
+  width: 100%;
+  background: linear-gradient(135deg, #00acc1 0%, #00838f 50%, #0b2545 100%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  box-sizing: border-box;
+  padding: 20px;
+}
+
+.dashboard-main-card {
+  width: 100%;
+  max-width: 1100px;
+  height: 85vh;
+  background-color: #eef2f5;
+  border-radius: 20px;
+  display: flex;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+/* Barra lateral (Sidebar Turquesa) */
+.dashboard-sidebar {
+  width: 280px;
+  min-width: 280px;
+  background-color: #00bcd4;
+  display: flex;
+  flex-direction: column;
+  padding: 30px 20px;
+  box-sizing: border-box;
+  justify-content: flex-start;
+}
+
+.sidebar-section {
+  margin-bottom: 25px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.4);
+  padding-bottom: 15px;
+}
+
+.sidebar-section h3 {
+  color: #0b2545;
+  font-size: 16px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.sidebar-link-btn {
+  background: transparent;
+  border: none;
+  display: block;
+  width: 100%;
+  text-align: center;
+  color: #072b42;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 8px 0;
+  margin-bottom: 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.sidebar-link-btn:hover {
+  background-color: rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+}
+
+/* Botón de Cerrar Sesión en el sidebar */
+.btn-logout-app {
+  margin-top: auto;
+  background-color: #ff5252;
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s;
+  text-align: center;
+}
+
+.btn-logout-app:hover {
+  background-color: #ff1744;
+}
+
+/* Área de contenido principal a la derecha */
+.dashboard-content-area {
+  flex: 1;
+  padding: 30px 40px;
+  overflow-y: auto;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-header-title {
+  color: #0b2545;
+  font-size: 22px;
+  font-weight: bold;
+  margin-bottom: 25px;
+  border-bottom: 2px solid #cbd5e1;
+  padding-bottom: 10px;
+}
+
+/* Tarjetas internas y paneles */
+.dashboard-card-inner {
+  background: #ffffff;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.dashboard-card-inner h2,
+.dashboard-card-inner h3 {
+  color: #0b2545;
+  margin-bottom: 15px;
+}
+
+.dashboard-card-inner p {
+  color: #4a5568;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Corrección de Inputs: fondo blanco y tipografía legible */
+.product-form-embedded input,
+.dashboard-content-area input[type="text"],
+.dashboard-content-area input[type="number"] {
+  width: 100%;
+  padding: 10px;
+  background-color: #ffffff !important;
+  color: #0b2545 !important;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 14px;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.product-form-embedded input:focus,
+.dashboard-content-area input:focus {
+  border-color: #00bcd4;
+}
+
+/* Botones de acción */
+.btn-guardar {
+  background-color: #00bcd4;
+  color: #0b2545;
+  border: none;
+  padding: 10px 20px;
+  font-weight: bold;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-guardar:hover {
+  background-color: #00acc1;
+  color: white;
+}
+
+/* Tablas consistentes con el diseño */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #ffffff;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 15px;
+}
+
+th {
+  background-color: #e2e8f0;
+  color: #0b2545;
+  padding: 12px;
+  font-size: 13px;
+  text-align: left;
+  font-weight: bold;
+}
+
+td {
+  padding: 12px;
+  font-size: 13px;
+  color: #334155;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+tr:hover {
+  background-color: #f8fafc;
+}
+
+/* Contenedor relativo para posicionar las sugerencias debajo del input de categoría */
+.category-input-container {
+  position: relative;
+  width: 100%;
+}
+
+/* Lista flotante de categorías sugeridas */
+.category-suggestions-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-top: none;
+  border-bottom-left-radius: 6px;
+  border-bottom-right-radius: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 150px;
+  overflow-y: auto;
+  z-index: 10;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.category-suggestions-list li {
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #0b2545;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.category-suggestions-list li:hover {
+  background-color: #e2e8f0;
+}
+
+/* Contenedor relativo del input de categoría */
+.category-input-container {
+  position: relative;
+  width: 100%;
+}
+
+/* Lista flotante de categorías sugeridas */
+.category-suggestions-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-top: none;
+  border-bottom-left-radius: 6px;
+  border-bottom-right-radius: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 150px;
+  overflow-y: auto;
+  z-index: 999;
+  /* Asegura que flote por encima de todo */
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+}
+
+.category-suggestions-list li {
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #0b2545;
+  cursor: pointer;
+  background-color: #ffffff;
+  transition: background 0.15s ease;
+}
+
+.category-suggestions-list li:hover {
+  background-color: #e2e8f0;
+}
