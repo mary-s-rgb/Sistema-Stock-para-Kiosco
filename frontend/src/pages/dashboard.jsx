@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Products from '../components/productos';
 import '../estilos/dashboard.css';
+import Suppliers from '../components/proveedores';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -29,9 +30,10 @@ export default function Dashboard() {
           </div>
 
           <div className="sidebar-section">
-            <h3>PROVEEDORES</h3>
-            <button onClick={() => setActiveSection('suppliers-cat')} className="sidebar-link-btn">Categorías</button>
-            <button onClick={() => setActiveSection('suppliers-search')} className="sidebar-link-btn">Buscador (filtro)</button>
+           <h3>PROVEEDORES</h3>
+            <button onClick={() => setActiveSection('suppliers-add')}>Añadir nuevo</button>
+            <button onClick={() => setActiveSection('suppliers-search')}>Buscador (filtro)</button>
+        
           </div>
 
           <div className="sidebar-section">
@@ -75,12 +77,9 @@ export default function Dashboard() {
             <Products activeSection={activeSection} />
           )}
 
-          {/* OTRAS SECCIONES PLACEHOLDER */}
-          {activeSection.startsWith('suppliers') && (
-            <div className="dashboard-card-inner">
-              <h3>Módulo de Proveedores</h3>
-              <p>Sección en desarrollo según el diseño de categorías y buscadores.</p>
-            </div>
+          {/* Módulo de Proveedores */}
+          {(activeSection === 'suppliers-add' || activeSection === 'suppliers-search') && (
+            <Suppliers activeSection={activeSection} />
           )}
 
           {activeSection.startsWith('history') && (

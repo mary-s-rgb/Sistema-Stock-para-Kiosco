@@ -276,3 +276,59 @@ app.delete('/api/products/:id', (req, res) => {
     res.json({ message: 'Producto eliminado correctamente' });
   });
 });
+
+// === MÓDULO DE PROVEEDORES (CRUD) ===
+
+// 1. Obtener todos los proveedores
+app.get('/api/suppliers', (req, res) => {
+  db.all('SELECT * FROM proveedores', [], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ message: 'Error al obtener proveedores' });
+    }
+    res.json(rows);
+  });
+});
+
+// 2. Añadir un nuevo proveedor
+app.post('/api/suppliers', (req, res) => {
+  const { nombre, telefono, email } = req.body;
+
+  if (!nombre) {
+    return res.status(400).json({ message: 'El nombre del proveedor es obligatorio' });
+  }
+
+  const query = `INSERT INTO proveedores (nombre, telefono, email) VALUES (?, ?, ?)`;
+  db.run(query, [nombre, telefono || '', email || ''], function (err) {
+    if (err) {
+      return res.status(500).json({ message: 'Error al registrar el proveedor' });
+    }
+    res.status(201).json({ id: this.lastID, message: 'Proveedor creado con éxito' });
+  });
+});
+
+// 3. Actualizar un proveedor
+app.put('/api/suppliers/:id', (req, res) => {
+  const { id } = req.params;
+  const { nombre, telefono, email } = req.body;
+
+  const query = `UPDATE proveedores SET nombre = ?, telefono = ?, email = ? WHERE id = ?`;
+  db.run(query, [nombre, telefono, email, id], function (err) {
+    if (err) {
+      return res.status(500).json({ message: 'Error al actualizar el proveedor' });
+    }
+    res.json({ message: 'Proveedor actualizado correctamente' });
+  });
+});
+
+// 4. Eliminar un proveedor
+app.delete('/api/suppliers/:id', (req, res) => {
+  const { id } = req.params;
+  const query = `DELETE FROM proveedores WHERE id = ?`;
+
+  db.run(query, [id], function (err) {
+    if (err) {
+      return res.status(500).json({ message: 'Error al eliminar el proveedor (puede estar asociado a productos)' });
+    }
+    res.json({ message: 'Proveedor eliminado correctamente' });
+  });
+});

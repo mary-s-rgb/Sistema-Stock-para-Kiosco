@@ -1,9 +1,11 @@
+// src/components/products.jsx
 import { useState, useEffect, useCallback } from 'react';
+import { obtenerEstacionActual } from '../utils/dataUtils';
 
 export default function Products({ activeSection }) {
   const [products, setProducts] = useState([]);
   const [categorias, setCategorias] = useState([]);
-  const [proveedores, setProveedores] = useState([]); // <-- Estado para proveedores
+  const [proveedores, setProveedores] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState(null);
   
@@ -13,7 +15,7 @@ export default function Products({ activeSection }) {
     precio_costo: 0,
     precio_venta: 0,
     categoria_id: '',
-    proveedor_id: '', // <-- Incluido en el form
+    proveedor_id: '',
     temporada_alta: 'TODA_TEMP',
     stock: 0
   });
@@ -21,7 +23,8 @@ export default function Products({ activeSection }) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // 1. Función para obtener los productos
+  const estacionActual = obtenerEstacionActual();
+
   const fetchProducts = useCallback(async () => {
     try {
       const res = await fetch('http://localhost:3001/api/products');
@@ -34,7 +37,6 @@ export default function Products({ activeSection }) {
     }
   }, []);
 
-  // 2. Función dinámica para obtener las categorías
   const fetchCategorias = useCallback(async () => {
     try {
       const res = await fetch('http://localhost:3001/api/categorias');
@@ -47,7 +49,6 @@ export default function Products({ activeSection }) {
     }
   }, []);
 
-  // 3. Función dinámica para obtener los proveedores (preparada para el CRUD futuro)
   const fetchProveedores = useCallback(async () => {
     try {
       const res = await fetch('http://localhost:3001/api/proveedores');
@@ -60,7 +61,6 @@ export default function Products({ activeSection }) {
     }
   }, []);
 
-  // Cargar todos los datos al iniciar el componente
   useEffect(() => {
     fetchProducts();
     fetchCategorias();
@@ -102,7 +102,7 @@ export default function Products({ activeSection }) {
           stock: 0
         });
         setEditingId(null);
-        fetchProducts(); // Refresca la tabla de productos
+        fetchProducts();
       } else {
         setError(data.message || 'Error en la operación.');
       }
@@ -119,7 +119,7 @@ export default function Products({ activeSection }) {
       precio_costo: product.precio_costo || 0,
       precio_venta: product.precio_venta || 0,
       categoria_id: product.categoria_id || '',
-      proveedor_id: product.proveedor_id || '', // <-- Carga el proveedor al editar
+      proveedor_id: product.proveedor_id || '',
       temporada_alta: product.temporada_alta || 'TODA_TEMP',
       stock: product.stock || 0
     });
@@ -138,7 +138,7 @@ export default function Products({ activeSection }) {
     }
   };
 
-  const filteredProducts = products.filter((p) => {
+  const filteredProducts = searchTerm.trim() === '' ? [] : products.filter((p) => {
     const term = searchTerm.toLowerCase();
     return (
       (p.nombre && p.nombre.toLowerCase().includes(term)) ||
@@ -151,13 +151,11 @@ export default function Products({ activeSection }) {
       {error && <p className="error-message" style={{ color: '#e74c3c', marginBottom: '15px' }}>{error}</p>}
       {success && <p className="success-message" style={{ color: '#27ae60', marginBottom: '15px' }}>{success}</p>}
 
-      {/* VISTA 1: AÑADIR / EDITAR PRODUCTO */}
       {activeSection === 'products-add' && (
         <div className="dashboard-card-inner">
           <h3>{editingId ? 'Editar Producto' : 'Añadir Nuevo Producto'}</h3>
           <form onSubmit={handleSubmit} className="product-form-embedded">
             <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
-              
               <div className="form-group">
                 <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold', color: '#0b2545' }}>Código de Barras</label>
                 <input type="text" name="codigo_barras" placeholder="Ej. 779123456789" value={form.codigo_barras} onChange={handleInputChange} required />
@@ -178,7 +176,6 @@ export default function Products({ activeSection }) {
                 <input type="number" name="precio_venta" placeholder="0.00" value={form.precio_venta} onChange={handleInputChange} required />
               </div>
 
-              {/* Selector de Categorías */}
               <div className="form-group">
                 <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold', color: '#0b2545' }}>Categoría</label>
                 <select name="categoria_id" value={form.categoria_id} onChange={handleInputChange} required>
@@ -189,7 +186,6 @@ export default function Products({ activeSection }) {
                 </select>
               </div>
 
-              {/* Selector de Proveedores (Dinámico) */}
               <div className="form-group">
                 <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold', color: '#0b2545' }}>Proveedor</label>
                 <select name="proveedor_id" value={form.proveedor_id} onChange={handleInputChange}>
@@ -200,7 +196,6 @@ export default function Products({ activeSection }) {
                 </select>
               </div>
 
-              {/* Selector de Temporada */}
               <div className="form-group">
                 <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold', color: '#0b2545' }}>Temporada Alta</label>
                 <select name="temporada_alta" value={form.temporada_alta} onChange={handleInputChange}>
@@ -210,7 +205,6 @@ export default function Products({ activeSection }) {
                 </select>
               </div>
 
-              {/* Stock inicial */}
               <div className="form-group" style={{ gridColumn: 'span 2' }}>
                 <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold', color: '#0b2545' }}>Stock Inicial</label>
                 <input type="number" name="stock" placeholder="Cantidad inicial en estantería" value={form.stock} onChange={handleInputChange} required style={{ width: '100%' }} />
@@ -231,55 +225,72 @@ export default function Products({ activeSection }) {
         </div>
       )}
 
-      {/* VISTA 2: BUSCADOR Y LISTADO DE PRODUCTOS (CRUD) */}
       {activeSection === 'products-search' && (
         <div className="dashboard-card-inner">
           <h3>Gestión y Buscador de Productos</h3>
           <div style={{ margin: '15px 0' }}>
             <input 
               type="text" 
-              placeholder="Buscar por nombre o código de barras..." 
+              placeholder="Escribe para buscar por nombre o código de barras..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
             />
           </div>
 
-          <table>
-            <thead>
-              <tr>
-                <th>Producto</th>
-                <th>Categoría</th>
-                <th>Stock</th>
-                <th>Costo</th>
-                <th>Venta</th>
-                <th>Código</th>
-                <th>Temporada</th>
-                <th style={{ textAlign: 'center' }}>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredProducts.map((p) => {
-                const isLowStock = p.stock <= 5;
-                return (
-                  <tr key={p.id}>
-                    <td>{p.nombre}</td>
-                    <td>{p.categoria_nombre || 'Sin categoría'}</td>
-                    <td style={{ color: isLowStock ? '#e74c3c' : 'inherit', fontWeight: isLowStock ? 'bold' : 'normal' }}>
-                      {p.stock} {isLowStock && '⚠️'}
-                    </td>
-                    <td>${p.precio_costo}</td>
-                    <td>${p.precio_venta}</td>
-                    <td>{p.codigo_barras}</td>
-                    <td>{p.temporada_alta}</td>
-                    <td style={{ textAlign: 'center', display: 'flex', gap: '5px', justifyContent: 'center' }}>
-                      <button onClick={() => handleEdit(p)} style={{ background: '#3498db', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}>Editar</button>
-                      <button onClick={() => handleDelete(p.id)} style={{ background: '#e74c3c', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}>Eliminar</button>
-                    </td>
+          {searchTerm.trim() === '' ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+              <p>🔍 Ingrese un término en el buscador para consultar el inventario de productos.</p>
+            </div>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Categoría</th>
+                  <th>Stock</th>
+                  <th>Costo</th>
+                  <th>Venta</th>
+                  <th>Código</th>
+                  <th>Temporada</th>
+                  <th style={{ textAlign: 'center' }}>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredProducts.length === 0 ? (
+                  <tr>
+                    <td colSpan="8" style={{ textAlign: 'center', padding: '20px' }}>No se encontraron productos coincidentes.</td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                ) : (
+                  filteredProducts.map((p) => {
+                    const esTemporadaAltaActual = p.temporada_alta === estacionActual;
+                    const umbralAlerta = esTemporadaAltaActual ? 15 : 5;
+                    const isLowStock = p.stock <= umbralAlerta;
+
+                    return (
+                      <tr key={p.id}>
+                        <td>{p.nombre}</td>
+                        <td>{p.categoria_nombre || 'Sin categoría'}</td>
+                        <td style={{ color: isLowStock ? '#e74c3c' : 'inherit', fontWeight: isLowStock ? 'bold' : 'normal' }}>
+                          {p.stock} {isLowStock && (
+                            <span title={`Alerta estacional: Stock bajo para ${estacionActual}`}>⚠️</span>
+                          )}
+                        </td>
+                        <td>${p.precio_costo}</td>
+                        <td>${p.precio_venta}</td>
+                        <td>{p.codigo_barras}</td>
+                        <td>{p.temporada_alta}</td>
+                        <td style={{ textAlign: 'center', display: 'flex', gap: '5px', justifyContent: 'center' }}>
+                          <button onClick={() => handleEdit(p)} style={{ background: '#3498db', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}>Editar</button>
+                          <button onClick={() => handleDelete(p.id)} style={{ background: '#e74c3c', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}>Eliminar</button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
     </div>
