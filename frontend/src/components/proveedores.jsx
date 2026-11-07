@@ -1,5 +1,6 @@
 // src/components/proveedores.jsx
 import { useState, useEffect, useCallback } from 'react';
+import '../estilos/dashboard.css';
 
 export default function Suppliers({ activeSection }) {
   const [suppliers, setSuppliers] = useState([]);

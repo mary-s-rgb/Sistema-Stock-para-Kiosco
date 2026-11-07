@@ -31,8 +31,8 @@ export default function Dashboard() {
 
           <div className="sidebar-section">
            <h3>PROVEEDORES</h3>
-            <button onClick={() => setActiveSection('suppliers-add')}>Añadir nuevo</button>
-            <button onClick={() => setActiveSection('suppliers-search')}>Buscador (filtro)</button>
+            <button onClick={() => setActiveSection('suppliers-add')} className="sidebar-link-btn">Añadir nuevo</button>
+            <button onClick={() => setActiveSection('suppliers-search')} className="sidebar-link-btn">Buscador (filtro)</button>
         
           </div>
 
@@ -41,6 +41,14 @@ export default function Dashboard() {
             <button onClick={() => setActiveSection('history-monthly')} className="sidebar-link-btn">Mensual</button>
             <button onClick={() => setActiveSection('history-annual')} className="sidebar-link-btn">Anual</button>
           </div>
+
+          <div className="sidebar-section">
+            <h3>ADMINISTRACIÓN</h3>
+                  <button onClick={() => navigate('/admin/users')} className="sidebar-link-btn">
+                    Gestionar Usuarios (SUPRA)
+                  </button>
+          </div>
+        
 
           <button onClick={handleLogout} className="btn-logout-app">
             Cerrar Sesión
@@ -62,13 +70,7 @@ export default function Dashboard() {
               <h2>Bienvenido al sistema de control de stock</h2>
               <p>Utiliza el menú lateral turquesa para navegar entre las opciones de Productos, Proveedores e Historial.</p>
               
-              {storedUser.rol === 'SUPRA' && (
-                <div className="admin-shortcut" style={{ marginTop: '20px' }}>
-                  <button onClick={() => navigate('/admin/users')} className="btn-admin-shortcut">
-                    Gestionar Usuarios (SUPRA)
-                  </button>
-                </div>
-              )}
+             
             </div>
           )}
 

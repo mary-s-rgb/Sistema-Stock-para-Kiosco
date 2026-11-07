@@ -4,7 +4,7 @@ import Login from './pages/login';
 import Register from './pages/register';
 import Dashboard from './pages/dashboard';
 import RecoverPassword from './pages/recover-password';
-import AdminUser from './pages/adminUser';
+import AdminUser from './components/adminUser';
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token');

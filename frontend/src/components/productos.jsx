@@ -1,6 +1,7 @@
 // src/components/products.jsx
 import { useState, useEffect, useCallback } from 'react';
 import { obtenerEstacionActual } from '../utils/dataUtils';
+import '../estilos/productos.css';
 
 export default function Products({ activeSection }) {
   const [products, setProducts] = useState([]);
@@ -179,7 +180,7 @@ export default function Products({ activeSection }) {
               <div className="form-group">
                 <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold', color: '#0b2545' }}>Categoría</label>
                 <select name="categoria_id" value={form.categoria_id} onChange={handleInputChange} required>
-                  <option value="">Seleccione una categoría...</option>
+                  <option value="" >Seleccione una categoría...</option>
                   {categorias.map((cat) => (
                     <option key={cat.id} value={cat.id}>{cat.nombre}</option>
                   ))}
