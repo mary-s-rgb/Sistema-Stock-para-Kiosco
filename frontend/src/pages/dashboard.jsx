@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Products from '../components/productos';
 import '../estilos/dashboard.css';
 import Suppliers from '../components/proveedores';
+import History from '../components/historial';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -32,23 +33,25 @@ export default function Dashboard() {
           <div className="sidebar-section">
            <h3>PROVEEDORES</h3>
             <button onClick={() => setActiveSection('suppliers-add')} className="sidebar-link-btn">Añadir nuevo</button>
-            <button onClick={() => setActiveSection('suppliers-search')} className="sidebar-link-btn">Buscador (filtro)</button>
+            <button onClick={() => setActiveSection('suppliers-search')}  className="sidebar-link-btn">Buscador (filtro)</button>
         
           </div>
 
-          <div className="sidebar-section">
-            <h3>HISTORIAL</h3>
-            <button onClick={() => setActiveSection('history-monthly')} className="sidebar-link-btn">Mensual</button>
-            <button onClick={() => setActiveSection('history-annual')} className="sidebar-link-btn">Anual</button>
-          </div>
-
-          <div className="sidebar-section">
-            <h3>ADMINISTRACIÓN</h3>
-                  <button onClick={() => navigate('/admin/users')} className="sidebar-link-btn">
-                    Gestionar Usuarios (SUPRA)
-                  </button>
-          </div>
-        
+        <div className="sidebar-section">
+          <h3>HISTORIAL</h3>
+          <button onClick={() => setActiveSection('history-register')} className="sidebar-link-btn">Registrar Compra</button>
+          <button onClick={() => setActiveSection('history-monthly')} className="sidebar-link-btn">Mensual</button>
+          <button onClick={() => setActiveSection('history-annual')} className="sidebar-link-btn">Anual</button>
+        </div>
+{/* Sección de administración visible exclusivamente para el rol SUPRA */}
+          {storedUser.rol === 'SUPRA' && (
+            <div className="sidebar-section">
+              <h3>ADMINISTRACIÓN</h3>
+              <button onClick={() => navigate('/admin/users')} className="sidebar-link-btn">
+                Gestionar Usuarios (SUPRA)
+              </button>
+            </div>
+          )}
 
           <button onClick={handleLogout} className="btn-logout-app">
             Cerrar Sesión
@@ -85,10 +88,7 @@ export default function Dashboard() {
           )}
 
           {activeSection.startsWith('history') && (
-            <div className="dashboard-card-inner">
-              <h3>Historial de Ventas ({activeSection.includes('monthly') ? 'Mensual' : 'Anual'})</h3>
-              <p>Reportes de movimientos y transacciones registradas.</p>
-            </div>
+            <History activeSection={activeSection} />
           )}
 
         </main>

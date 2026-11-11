@@ -59,14 +59,36 @@ const sqlScript = `
   );
 
 
-CREATE TABLE IF NOT EXISTS usuarios (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nombre TEXT NOT NULL,
-    email TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    rol TEXT CHECK(rol IN ('ADMIN', 'SUPRA')) NOT NULL DEFAULT 'ADMIN',
-    creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
+  CREATE TABLE IF NOT EXISTS usuarios (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      rol TEXT CHECK(rol IN ('ADMIN', 'SUPRA')) NOT NULL DEFAULT 'ADMIN',
+      creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+  CREATE TABLE IF NOT EXISTS facturas_compra (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      proveedor_id INTEGER,
+      numero_factura TEXT NOT NULL,
+      fecha TEXT NOT NULL,
+      total REAL NOT NULL,
+      FOREIGN KEY(proveedor_id) REFERENCES proveedores(id)
+    );
+
+  CREATE TABLE IF NOT EXISTS detalle_compras (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        factura_id INTEGER,
+        producto_id INTEGER,
+        cantidad INTEGER NOT NULL,
+        precio_costo_unitario REAL NOT NULL,
+        FOREIGN KEY(factura_id) REFERENCES facturas_compra(id) ON DELETE CASCADE,
+        FOREIGN KEY(producto_id) REFERENCES productos(id)
+      );
+
+
+
 `;
 
 // Ejecución del script
@@ -78,3 +100,4 @@ db.exec(sqlScript, (err) => {
   }
   db.close();
 });
+
