@@ -19,15 +19,16 @@ export default function Products({ activeSection }) {
 
   // Formulario exclusivo para AÑADIR producto
   const [form, setForm] = useState({
-    codigo_barras: '',
-    nombre: '',
-    precio_costo: 0,
-    precio_venta: 0,
-    categoria_id: '',
-    proveedor_id: '',
-    temporada_alta: 'TODA_TEMP',
-    stock: 0
-  });
+      codigo_barras: '',
+      nombre: '',
+      precio_costo: 0,
+      precio_venta: 0,
+      categoria_id: '',
+      proveedor_id: '',
+      temporada_alta: 'TODA_TEMP',
+      stock: 0,
+      stock_minimo: 5
+    });
 
   // Estados exclusivos para el MODAL DE EDICIÓN de producto
   const [showEditModal, setShowEditModal] = useState(false);
@@ -191,7 +192,8 @@ export default function Products({ activeSection }) {
           categoria_id: '',
           proveedor_id: '',
           temporada_alta: 'TODA_TEMP',
-          stock: 0
+          stock: 0,
+          stock_minimo: 5
         });
         fetchProducts();
       } else {
@@ -203,7 +205,7 @@ export default function Products({ activeSection }) {
   };
 
   // Abrir modal de edición con los datos del producto seleccionado
-  const handleOpenEditModal = (product) => {
+const handleOpenEditModal = (product) => {
     setEditForm({
       id: product.id,
       codigo_barras: product.codigo_barras || '',
@@ -213,7 +215,8 @@ export default function Products({ activeSection }) {
       categoria_id: product.categoria_id || '',
       proveedor_id: product.proveedor_id || '',
       temporada_alta: product.temporada_alta || 'TODA_TEMP',
-      stock: product.stock || 0
+      stock: product.stock || 0,
+      stock_minimo: product.stock_minimo_vigente ?? 5
     });
     setShowEditModal(true);
   };
@@ -350,6 +353,22 @@ export default function Products({ activeSection }) {
                 <input type="number" name="stock" placeholder="Cantidad inicial en estantería" value={form.stock} onChange={handleInputChange} required style={{ width: '100%' }} />
               </div>
             </div>
+
+
+              <div className="form-group">
+                <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold', color: '#0b2545' }}>
+                  Stock Mínimo (Alerta Estacional)
+                </label>
+                <input
+                  type="number"
+                  name="stock_minimo"
+                  min="1"
+                  value={form.stock_minimo}
+                  onChange={handleInputChange}
+                  required
+                  style={{ width: '100%' }}
+                />
+              </div>
             
             <button type="submit" className="btn-guardar">
               Guardar Producto
@@ -465,31 +484,32 @@ export default function Products({ activeSection }) {
                     <td colSpan="8" style={{ textAlign: 'center', padding: '20px' }}>No se encontraron productos coincidentes.</td>
                   </tr>
                 ) : (
-                  filteredProducts.map((p) => {
-                    const esTemporadaAltaActual = p.temporada_alta === estacionActual;
-                    const umbralAlerta = esTemporadaAltaActual ? 15 : 5;
-                    const isLowStock = p.stock <= umbralAlerta;
+                    filteredProducts.map((p) => {
+                      const umbralAlerta = p.stock_minimo_vigente ?? 5;
+                      const isLowStock = p.stock <= umbralAlerta;
 
-                    return (
-                      <tr key={p.id}>
-                        <td>{p.nombre}</td>
-                        <td>{p.categoria_nombre || 'Sin categoría'}</td>
-                        <td style={{ color: isLowStock ? '#e74c3c' : 'inherit', fontWeight: isLowStock ? 'bold' : 'normal' }}>
-                          {p.stock} {isLowStock && (
-                            <span title={`Alerta estacional: Stock bajo para ${estacionActual}`}>⚠️</span>
-                          )}
-                        </td>
-                        <td>${p.precio_costo}</td>
-                        <td>${p.precio_venta}</td>
-                        <td>{p.codigo_barras}</td>
-                        <td>{p.temporada_alta}</td>
-                        <td style={{ textAlign: 'center', display: 'flex', gap: '5px', justifyContent: 'center' }}>
-                          <button onClick={() => handleOpenEditModal(p)} style={{ background: '#3498db', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}>Editar</button>
-                          <button onClick={() => handleDelete(p.id)} style={{ background: '#e74c3c', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}>Eliminar</button>
-                        </td>
-                      </tr>
-                    );
-                  })
+                      return (
+                        <tr key={p.id}>
+                          <td>{p.nombre}</td>
+                          <td>{p.categoria_nombre || 'Sin categoría'}</td>
+                          <td style={{ color: isLowStock ? '#e74c3c' : 'inherit', fontWeight: isLowStock ? 'bold' : 'normal' }}>
+                            {p.stock} {isLowStock && (
+                              <span title={`Alerta (${p.estacion_actual || estacionActual}): Stock actual (${p.stock}) por debajo del mínimo configurado (${umbralAlerta} u.)`}>
+                                ⚠️
+                              </span>
+                            )}
+                          </td>
+                          <td>${p.precio_costo}</td>
+                          <td>${p.precio_venta}</td>
+                          <td>{p.codigo_barras}</td>
+                          <td>{p.temporada_alta}</td>
+                          <td style={{ textAlign: 'center', display: 'flex', gap: '5px', justifyContent: 'center' }}>
+                            <button onClick={() => handleOpenEditModal(p)} style={{ background: '#3498db', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}>Editar</button>
+                            <button onClick={() => handleDelete(p.id)} style={{ background: '#e74c3c', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}>Eliminar</button>
+                          </td>
+                        </tr>
+                      );
+                    })
                 )}
               </tbody>
             </table>

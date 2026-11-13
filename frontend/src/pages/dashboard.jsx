@@ -37,12 +37,16 @@ export default function Dashboard() {
         
           </div>
 
-        <div className="sidebar-section">
-          <h3>HISTORIAL</h3>
-          <button onClick={() => setActiveSection('history-register')} className="sidebar-link-btn">Registrar Compra</button>
-          <button onClick={() => setActiveSection('history-monthly')} className="sidebar-link-btn">Mensual</button>
-          <button onClick={() => setActiveSection('history-annual')} className="sidebar-link-btn">Anual</button>
-        </div>
+{/* Historial */}
+          <div className="sidebar-section">
+            <h3>HISTORIAL</h3>
+            <button onClick={() => setActiveSection('history-register')} className={activeSection === 'history-register' ? 'sidebar-link-btn active' : 'sidebar-link-btn'}>Registrar Compra</button>
+            <button onClick={() => setActiveSection('history-invoices')} className={activeSection === 'history-invoices' ? 'sidebar-link-btn active' : 'sidebar-link-btn'}>Listado de Facturas</button>
+            <button onClick={() => setActiveSection('history-monthly')} className={activeSection === 'history-monthly' ? 'sidebar-link-btn active' : 'sidebar-link-btn'}>Mensual</button>
+            <button onClick={() => setActiveSection('history-annual')} className={activeSection === 'history-annual' ? 'sidebar-link-btn active' : 'sidebar-link-btn'}>Anual</button>
+          </div>
+          
+
 {/* Sección de administración visible exclusivamente para el rol SUPRA */}
           {storedUser.rol === 'SUPRA' && (
             <div className="sidebar-section">

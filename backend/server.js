@@ -23,7 +23,106 @@ const db = new sqlite3.Database(
   }
 );
 
-// 2. SEGUNDO: Importamos y montamos las rutas modulares (pasando 'db' correctamente ya inicializada)
+// 2. CREACIÓN AUTOMÁTICA DE TODAS LAS TABLAS AL INICIAR (Garantiza arranque desde cero)
+db.serialize(() => {
+  db.run("PRAGMA foreign_keys = ON;");
+
+  db.run(`CREATE TABLE IF NOT EXISTS categorias (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL UNIQUE,
+      descripcion TEXT
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS proveedores (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL,
+      telefono TEXT,
+      email TEXT
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS productos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      codigo_barras TEXT UNIQUE,
+      nombre TEXT NOT NULL,
+      precio_costo REAL NOT NULL DEFAULT 0,
+      precio_venta REAL NOT NULL DEFAULT 0,
+      categoria_id INTEGER,
+      proveedor_id INTEGER,
+      temporada_alta TEXT CHECK(temporada_alta IN ('VERANO', 'INVIERNO', 'TODA_TEMP')) DEFAULT 'TODA_TEMP',
+      FOREIGN KEY (categoria_id) REFERENCES categorias(id),
+      FOREIGN KEY (proveedor_id) REFERENCES proveedores(id)
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS stock (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      producto_id INTEGER UNIQUE NOT NULL,
+      cantidad_actual INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE CASCADE
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS atributos_estacionales (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      producto_id INTEGER NOT NULL,
+      temporada TEXT CHECK(temporada IN ('VERANO', 'INVIERNO', 'REGULAR')) NOT NULL,
+      stock_minimo INTEGER NOT NULL DEFAULT 5,
+      stock_deseado INTEGER NOT NULL DEFAULT 20,
+      FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE CASCADE,
+      UNIQUE(producto_id, temporada)
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS usuarios (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      rol TEXT CHECK(rol IN ('ADMIN', 'SUPRA')) NOT NULL DEFAULT 'ADMIN',
+      creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS facturas_compra (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      proveedor_id INTEGER,
+      numero_factura TEXT NOT NULL,
+      fecha TEXT NOT NULL,
+      total REAL NOT NULL,
+      FOREIGN KEY(proveedor_id) REFERENCES proveedores(id)
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS detalle_compras (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      factura_id INTEGER,
+      producto_id INTEGER,
+      cantidad INTEGER NOT NULL,
+      precio_costo_unitario REAL NOT NULL,
+      FOREIGN KEY(factura_id) REFERENCES facturas_compra(id) ON DELETE CASCADE,
+      FOREIGN KEY(producto_id) REFERENCES productos(id)
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS compras (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      producto_id INTEGER,
+      proveedor_id INTEGER,
+      cantidad INTEGER NOT NULL,
+      precio_costo_unitario REAL NOT NULL,
+      fecha TEXT NOT NULL,
+      FOREIGN KEY(producto_id) REFERENCES productos(id),
+      FOREIGN KEY(proveedor_id) REFERENCES proveedores(id)
+  )`);
+});
+
+
+// Función auxiliar para verificar si una fecha (formato YYYY-MM-DD) pertenece al mes actual
+const esDelMesActual = (fechaStr) => {
+  if (!fechaStr) return false;
+  const [anioFactura, mesFactura] = fechaStr.split('-');
+  const fechaActual = new Date();
+  const anioActual = fechaActual.getFullYear().toString();
+  const mesActual = (fechaActual.getMonth() + 1).toString().padStart(2, '0');
+  
+  return anioFactura === anioActual && mesFactura === mesActual;
+};
+
+// 3. SEGUNDO: Importamos y montamos las rutas modulares
 const recoverPasswordRoutes = require('./recover-password');
 app.use('/api', recoverPasswordRoutes(db));
 
@@ -114,6 +213,7 @@ const verifySupraRole = (req, res, next) => {
   }
 };
 
+// 1. CREAR nueva factura de compra (POST)
 app.post('/api/facturas-compra', (req, res) => {
   const { proveedor_id, numero_factura, fecha, items } = req.body;
 
@@ -121,16 +221,24 @@ app.post('/api/facturas-compra', (req, res) => {
     return res.status(400).json({ message: 'Faltan datos de la factura o los ítems están vacíos.' });
   }
 
-  // Calcular el total general de la factura
-  const totalFactura = items.reduce((acc, item) => acc + (Number(item.cantidad) * Number(item.precio_costo_unitario)), 0);
+  // Opcional: evitar también registrar facturas con fecha de meses pasados
+  if (!esDelMesActual(fecha)) {
+    return res.status(403).json({
+      message: 'Acción denegada: Solo se pueden registrar facturas correspondientes al mes actual.'
+    });
+  }
+
+  const totalFactura = items.reduce(
+    (acc, item) => acc + Number(item.cantidad) * Number(item.precio_costo_unitario),
+    0
+  );
 
   db.serialize(() => {
     db.run('BEGIN TRANSACTION;');
 
-    // 1. Insertar la Cabecera de la Factura
     const queryCabecera = `INSERT INTO facturas_compra (proveedor_id, numero_factura, fecha, total) VALUES (?, ?, ?, ?)`;
-    
-    db.run(queryCabecera, [proveedor_id || null, numero_factura, fecha, totalFactura], function(errCabecera) {
+
+    db.run(queryCabecera, [proveedor_id || null, numero_factura, fecha, totalFactura], function (errCabecera) {
       if (errCabecera) {
         db.run('ROLLBACK;');
         return res.status(500).json({ message: 'Error al registrar la cabecera de la factura.' });
@@ -139,17 +247,14 @@ app.post('/api/facturas-compra', (req, res) => {
       const facturaId = this.lastID;
       let erroresEnItems = false;
 
-      // 2. Procesar cada ítem del detalle
       items.forEach((item) => {
         if (erroresEnItems) return;
 
         const queryDetalle = `INSERT INTO detalle_compras (factura_id, producto_id, cantidad, precio_costo_unitario) VALUES (?, ?, ?, ?)`;
-        
         db.run(queryDetalle, [facturaId, item.producto_id, item.cantidad, item.precio_costo_unitario], (errDetalle) => {
           if (errDetalle) erroresEnItems = true;
         });
 
-        // 3. Actualizar el stock actual del producto en la tabla 'stock'
         const queryUpdateStock = `
           INSERT INTO stock (producto_id, cantidad_actual) VALUES (?, ?)
           ON CONFLICT(producto_id) DO UPDATE SET cantidad_actual = cantidad_actual + ?
@@ -170,39 +275,130 @@ app.post('/api/facturas-compra', (req, res) => {
     });
   });
 });
-// Endpoint para crear una nueva categoría
-app.post('/api/categorias', (req, res) => {
-  const { nombre } = req.body;
 
-  if (!nombre) {
-    return res.status(400).json({ message: 'El nombre de la categoría es obligatorio.' });
+// 2. EDITAR factura de compra existente (PUT - Solo mes actual y recalcula stock)
+app.put('/api/facturas-compra/:id', (req, res) => {
+  const { id } = req.params;
+  const { proveedor_id, numero_factura, fecha, items } = req.body;
+
+  if (!numero_factura || !fecha || !items || items.length === 0) {
+    return res.status(400).json({ message: 'Faltan datos de la factura o los ítems están vacíos.' });
   }
 
-  const query = `INSERT INTO categorias (nombre) VALUES (?)`;
-  db.run(query, [nombre], function (err) {
-    if (err) {
-      if (err.message.includes('UNIQUE constraint failed')) {
-        return res.status(400).json({ message: 'La categoría ya existe.' });
+  db.get('SELECT fecha FROM facturas_compra WHERE id = ?', [id], (err, factura) => {
+    if (err || !factura) {
+      return res.status(404).json({ message: 'Factura no encontrada.' });
+    }
+
+    // Validar que tanto la fecha original como la nueva pertenezcan al mes actual
+    if (!esDelMesActual(factura.fecha) || !esDelMesActual(fecha)) {
+      return res.status(403).json({
+        message: 'Acción denegada: No se pueden modificar facturas de meses anteriores por motivos de seguridad y auditoría.'
+      });
+    }
+
+    // Consultar ítems anteriores para descontar el stock previo antes de aplicar el nuevo
+    db.all('SELECT producto_id, cantidad FROM detalle_compras WHERE factura_id = ?', [id], (errDet, oldItems) => {
+      if (errDet) {
+        return res.status(500).json({ message: 'Error al leer los ítems anteriores de la factura.' });
       }
-      return res.status(500).json({ message: 'Error al registrar la categoría.' });
-    }
-    res.status(201).json({ id: this.lastID, nombre, message: '¡Categoría creada con éxito!' });
+
+      const totalFactura = items.reduce(
+        (acc, item) => acc + Number(item.cantidad) * Number(item.precio_costo_unitario),
+        0
+      );
+
+      db.serialize(() => {
+        db.run('BEGIN TRANSACTION;');
+
+        // A. Revertir stock de los ítems anteriores
+        oldItems.forEach((old) => {
+          db.run(
+            'UPDATE stock SET cantidad_actual = MAX(0, cantidad_actual - ?) WHERE producto_id = ?',
+            [old.cantidad, old.producto_id]
+          );
+        });
+
+        // B. Eliminar detalles anteriores
+        db.run('DELETE FROM detalle_compras WHERE factura_id = ?', [id]);
+
+        // C. Actualizar cabecera de la factura
+        db.run(
+          'UPDATE facturas_compra SET proveedor_id = ?, numero_factura = ?, fecha = ?, total = ? WHERE id = ?',
+          [proveedor_id || null, numero_factura, fecha, totalFactura, id]
+        );
+
+        // D. Insertar nuevos ítems y sumar nuevo stock
+        items.forEach((item) => {
+          db.run(
+            'INSERT INTO detalle_compras (factura_id, producto_id, cantidad, precio_costo_unitario) VALUES (?, ?, ?, ?)',
+            [id, item.producto_id, item.cantidad, item.precio_costo_unitario]
+          );
+
+          db.run(
+            `INSERT INTO stock (producto_id, cantidad_actual) VALUES (?, ?)
+             ON CONFLICT(producto_id) DO UPDATE SET cantidad_actual = cantidad_actual + ?`,
+            [item.producto_id, item.cantidad, item.cantidad]
+          );
+        });
+
+        db.run('COMMIT;', (errCommit) => {
+          if (errCommit) {
+            db.run('ROLLBACK;');
+            return res.status(500).json({ message: 'Error al guardar los cambios de la factura.' });
+          }
+          res.json({ message: '¡Factura actualizada y stock recalculado con éxito!' });
+        });
+      });
+    });
   });
 });
 
-// === MÓDULO DE CATEGORÍAS (CRUD COMPLETO) ===
+// 3. ELIMINAR factura de compra (DELETE - Solo mes actual y revierte stock)
+app.delete('/api/facturas-compra/:id', (req, res) => {
+  const { id } = req.params;
 
-// 1. Obtener todas las categorías
-app.get('/api/categorias', (req, res) => {
-  db.all('SELECT * FROM categorias ORDER BY nombre ASC', [], (err, rows) => {
-    if (err) {
-      return res.status(500).json({ message: 'Error al obtener las categorías' });
+  db.get('SELECT fecha FROM facturas_compra WHERE id = ?', [id], (err, factura) => {
+    if (err || !factura) {
+      return res.status(404).json({ message: 'Factura no encontrada.' });
     }
-    res.json(rows);
+
+    if (!esDelMesActual(factura.fecha)) {
+      return res.status(403).json({
+        message: 'Acción denegada: No se pueden eliminar facturas de meses anteriores.'
+      });
+    }
+
+    db.all('SELECT producto_id, cantidad FROM detalle_compras WHERE factura_id = ?', [id], (errDet, oldItems) => {
+      if (errDet) {
+        return res.status(500).json({ message: 'Error al consultar los ítems de la factura.' });
+      }
+
+      db.serialize(() => {
+        db.run('BEGIN TRANSACTION;');
+
+        oldItems.forEach((old) => {
+          db.run(
+            'UPDATE stock SET cantidad_actual = MAX(0, cantidad_actual - ?) WHERE producto_id = ?',
+            [old.cantidad, old.producto_id]
+          );
+        });
+
+        db.run('DELETE FROM facturas_compra WHERE id = ?', [id]);
+
+        db.run('COMMIT;', (errCommit) => {
+          if (errCommit) {
+            db.run('ROLLBACK;');
+            return res.status(500).json({ message: 'Error al eliminar la factura.' });
+          }
+          res.json({ message: 'Factura eliminada y stock revertido correctamente.' });
+        });
+      });
+    });
   });
 });
 
-// 2. Crear una nueva categoría
+// Endpoint para crear una nueva categoría
 app.post('/api/categorias', (req, res) => {
   const { nombre, descripcion } = req.body;
 
@@ -219,6 +415,16 @@ app.post('/api/categorias', (req, res) => {
       return res.status(500).json({ message: 'Error al guardar la categoría' });
     }
     res.status(201).json({ id: this.lastID, nombre: nombre.trim(), message: 'Categoría creada con éxito' });
+  });
+});
+
+// 1. Obtener todas las categorías
+app.get('/api/categorias', (req, res) => {
+  db.all('SELECT * FROM categorias ORDER BY nombre ASC', [], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ message: 'Error al obtener las categorías' });
+    }
+    res.json(rows);
   });
 });
 
@@ -247,7 +453,6 @@ app.put('/api/categorias/:id', (req, res) => {
 app.delete('/api/categorias/:id', (req, res) => {
   const { id } = req.params;
 
-  // Verificar si hay productos asignados a esta categoría antes de borrar
   db.get('SELECT COUNT(*) AS count FROM productos WHERE categoria_id = ?', [id], (errCheck, row) => {
     if (errCheck) {
       return res.status(500).json({ message: 'Error al verificar dependencias' });
@@ -266,7 +471,6 @@ app.delete('/api/categorias/:id', (req, res) => {
     });
   });
 });
-
 
 // Endpoint 3: Obtener usuarios (Protegido)
 app.get('/api/users', verifySupraRole, (req, res) => {
@@ -297,16 +501,6 @@ app.delete('/api/users/:id', verifySupraRole, (req, res) => {
   });
 });
 
-// Endpoint para obtener todas las categorías
-app.get('/api/categorias', (req, res) => {
-  db.all('SELECT * FROM categorias', [], (err, rows) => {
-    if (err) {
-      return res.status(500).json({ message: 'Error al obtener categorías' });
-    }
-    res.json(rows);
-  });
-});
-
 // Endpoint para obtener proveedores
 app.get('/api/proveedores', (req, res) => {
   db.all('SELECT * FROM proveedores', [], (err, rows) => {
@@ -317,18 +511,42 @@ app.get('/api/proveedores', (req, res) => {
   });
 });
 
-// === MÓDULO DE PRODUCTOS ===
+// Función para determinar la estación actual (Hemisferio Sur)
+const obtenerEstacionServidor = () => {
+  const mes = new Date().getMonth() + 1; // 1 a 12
+  if (mes === 12 || mes === 1 || mes === 2) return 'VERANO';
+  if (mes >= 6 && mes <= 8) return 'INVIERNO';
+  return 'REGULAR';
+};
 
-// 1. Obtener todos los productos (trayendo el stock actual mediante un LEFT JOIN)
+// === MÓDULO DE PRODUCTOS CON ALERTAS ESTACIONALES ===
+
+// 1. Obtener todos los productos con su umbral dinámico
 app.get('/api/products', (req, res) => {
+  const estacionActual = obtenerEstacionServidor();
+
   const query = `
-    SELECT p.*, c.nombre AS categoria_nombre, COALESCE(s.cantidad_actual, 0) AS stock 
+    SELECT 
+      p.*, 
+      c.nombre AS categoria_nombre, 
+      COALESCE(s.cantidad_actual, 0) AS stock,
+      COALESCE(
+        ae_actual.stock_minimo,
+        ae_alta.stock_minimo,
+        CASE WHEN p.temporada_alta = ? THEN 15 ELSE 5 END
+      ) AS stock_minimo_vigente,
+      COALESCE(ae_actual.stock_deseado, ae_alta.stock_deseado, 20) AS stock_deseado_vigente,
+      ? AS estacion_actual
     FROM productos p
     LEFT JOIN categorias c ON p.categoria_id = c.id
     LEFT JOIN stock s ON p.id = s.producto_id
+    LEFT JOIN atributos_estacionales ae_actual 
+      ON p.id = ae_actual.producto_id AND ae_actual.temporada = ?
+    LEFT JOIN atributos_estacionales ae_alta 
+      ON p.id = ae_alta.producto_id AND ae_alta.temporada = CASE WHEN p.temporada_alta = 'TODA_TEMP' THEN 'REGULAR' ELSE p.temporada_alta END
   `;
 
-  db.all(query, [], (err, rows) => {
+  db.all(query, [estacionActual, estacionActual, estacionActual], (err, rows) => {
     if (err) {
       return res.status(500).json({ message: 'Error al obtener productos' });
     }
@@ -336,9 +554,20 @@ app.get('/api/products', (req, res) => {
   });
 });
 
-// 2. Añadir un nuevo producto 
+// 2. Añadir un nuevo producto y registrar sus umbrales estacionales
 app.post('/api/products', (req, res) => {
-  const { codigo_barras, nombre, precio_costo, precio_venta, categoria_id, proveedor_id, temporada_alta, stock } = req.body;
+  const {
+    codigo_barras,
+    nombre,
+    precio_costo,
+    precio_venta,
+    categoria_id,
+    proveedor_id,
+    temporada_alta,
+    stock,
+    stock_minimo,
+    stock_deseado
+  } = req.body;
 
   if (!nombre || !codigo_barras) {
     return res.status(400).json({ message: 'El nombre y el código de barras son obligatorios' });
@@ -352,36 +581,68 @@ app.post('/api/products', (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
 
-    db.run(queryProd, [codigo_barras, nombre, precio_costo || 0, precio_venta || 0, categoria_id || null, proveedor_id || null, temporada_alta || 'TODA_TEMP'], function (err) {
-      if (err) {
-        db.run('ROLLBACK;');
-        if (err.message.includes('UNIQUE constraint failed')) {
-          return res.status(400).json({ message: 'El código de barras ya está registrado' });
-        }
-        return res.status(500).json({ message: 'Error al guardar el producto' });
-      }
-
-      const prodId = this.lastID;
-      const queryStock = `INSERT INTO stock (producto_id, cantidad_actual) VALUES (?, ?)`;
-
-      db.run(queryStock, [prodId, stock || 0], (errStock) => {
-        if (errStock) {
+    db.run(
+      queryProd,
+      [codigo_barras, nombre, precio_costo || 0, precio_venta || 0, categoria_id || null, proveedor_id || null, temporada_alta || 'TODA_TEMP'],
+      function (err) {
+        if (err) {
           db.run('ROLLBACK;');
-          return res.status(500).json({ message: 'Error al registrar el stock inicial' });
+          if (err.message.includes('UNIQUE constraint failed')) {
+            return res.status(400).json({ message: 'El código de barras ya está registrado' });
+          }
+          return res.status(500).json({ message: 'Error al guardar el producto' });
         }
 
-        db.run('COMMIT;', () => {
-          res.status(201).json({ id: prodId, message: 'Producto creado con éxito' });
+        const prodId = this.lastID;
+        const queryStock = `INSERT INTO stock (producto_id, cantidad_actual) VALUES (?, ?)`;
+
+        db.run(queryStock, [prodId, stock || 0], (errStock) => {
+          if (errStock) {
+            db.run('ROLLBACK;');
+            return res.status(500).json({ message: 'Error al registrar el stock inicial' });
+          }
+
+          const tempObjetivo = temporada_alta === 'TODA_TEMP' ? 'REGULAR' : (temporada_alta || 'REGULAR');
+          const minVal = stock_minimo !== undefined && stock_minimo !== '' ? Number(stock_minimo) : (tempObjetivo !== 'REGULAR' ? 15 : 5);
+          const desVal = stock_deseado !== undefined && stock_deseado !== '' ? Number(stock_deseado) : 20;
+
+          const queryAttr = `
+            INSERT INTO atributos_estacionales (producto_id, temporada, stock_minimo, stock_deseado)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(producto_id, temporada) DO UPDATE SET stock_minimo = ?, stock_deseado = ?
+          `;
+
+          db.run(queryAttr, [prodId, tempObjetivo, minVal, desVal, minVal, desVal], (errAttr) => {
+            if (errAttr) {
+              db.run('ROLLBACK;');
+              return res.status(500).json({ message: 'Error al configurar alertas estacionales' });
+            }
+
+            db.run('COMMIT;', () => {
+              res.status(201).json({ id: prodId, message: 'Producto y alerta estacional creados con éxito' });
+            });
+          });
         });
-      });
-    });
+      }
+    );
   });
 });
 
-// 3. Actualizar un producto
+// 3. Actualizar un producto y su umbral estacional vigente
 app.put('/api/products/:id', (req, res) => {
   const { id } = req.params;
-  const { codigo_barras, nombre, precio_costo, precio_venta, categoria_id, proveedor_id, temporada_alta, stock } = req.body;
+  const {
+    codigo_barras,
+    nombre,
+    precio_costo,
+    precio_venta,
+    categoria_id,
+    proveedor_id,
+    temporada_alta,
+    stock,
+    stock_minimo,
+    stock_deseado
+  } = req.body;
 
   db.serialize(() => {
     db.run('BEGIN TRANSACTION;');
@@ -409,9 +670,32 @@ app.put('/api/products/:id', (req, res) => {
           return res.status(500).json({ message: 'Error al actualizar el stock' });
         }
 
-        db.run('COMMIT;', () => {
-          res.json({ message: 'Producto actualizado correctamente' });
-        });
+        if (stock_minimo !== undefined && stock_minimo !== '') {
+          const tempObjetivo = temporada_alta === 'TODA_TEMP' ? 'REGULAR' : (temporada_alta || 'REGULAR');
+          const minVal = Number(stock_minimo);
+          const desVal = stock_deseado !== undefined && stock_deseado !== '' ? Number(stock_deseado) : 20;
+
+          const queryAttr = `
+            INSERT INTO atributos_estacionales (producto_id, temporada, stock_minimo, stock_deseado)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(producto_id, temporada) DO UPDATE SET stock_minimo = ?, stock_deseado = ?
+          `;
+
+          db.run(queryAttr, [id, tempObjetivo, minVal, desVal, minVal, desVal], (errAttr) => {
+            if (errAttr) {
+              db.run('ROLLBACK;');
+              return res.status(500).json({ message: 'Error al actualizar alerta estacional' });
+            }
+
+            db.run('COMMIT;', () => {
+              res.json({ message: 'Producto y umbral estacional actualizados correctamente' });
+            });
+          });
+        } else {
+          db.run('COMMIT;', () => {
+            res.json({ message: 'Producto actualizado correctamente' });
+          });
+        }
       });
     });
   });
@@ -420,9 +704,7 @@ app.put('/api/products/:id', (req, res) => {
 // 4. Eliminar un producto
 app.delete('/api/products/:id', (req, res) => {
   const { id } = req.params;
-  const query = 'DELETE FROM productos WHERE id = ?';
-
-  db.run(query, [id], function (err) {
+  db.run('DELETE FROM productos WHERE id = ?', [id], function (err) {
     if (err) {
       return res.status(500).json({ message: 'Error al eliminar el producto' });
     }
@@ -484,79 +766,16 @@ app.delete('/api/suppliers/:id', (req, res) => {
 
 // === MÓDULO DE HISTORIAL Y COMPRAS ===
 
-// Crear tabla de compras si no existe
-db.run(`CREATE TABLE IF NOT EXISTS compras (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  producto_id INTEGER,
-  proveedor_id INTEGER,
-  cantidad INTEGER NOT NULL,
-  precio_costo_unitario REAL NOT NULL,
-  fecha TEXT NOT NULL,
-  FOREIGN KEY(producto_id) REFERENCES productos(id),
-  FOREIGN KEY(proveedor_id) REFERENCES proveedores(id)
-)`);
-
-// 1. Registrar una nueva compra y actualizar el stock sumando a la tabla 'stock'
-app.post('/api/compras', (req, res) => {
-  const { producto_id, proveedor_id, cantidad, precio_costo_unitario, fecha } = req.body;
-
-  if (!producto_id || !cantidad || !precio_costo_unitario || !fecha) {
-    return res.status(400).json({ message: 'Faltan datos obligatorios para registrar la compra.' });
-  }
-
-  db.serialize(() => {
-    db.run('BEGIN TRANSACTION;');
-
-    const queryCompra = `
-      INSERT INTO compras (producto_id, proveedor_id, cantidad, precio_costo_unitario, fecha) 
-      VALUES (?, ?, ?, ?, ?)
-    `;
-    
-    db.run(queryCompra, [producto_id, proveedor_id || null, cantidad, precio_costo_unitario, fecha], function(errCompra) {
-      if (errCompra) {
-        db.run('ROLLBACK;');
-        return res.status(500).json({ message: 'Error al registrar la compra en el historial.' });
-      }
-
-      db.get(`SELECT cantidad_actual FROM stock WHERE producto_id = ?`, [producto_id], (errGetStock, row) => {
-        if (errGetStock) {
-          db.run('ROLLBACK;');
-          return res.status(500).json({ message: 'Error al consultar el stock actual.' });
-        }
-
-        const stockActual = row ? row.cantidad_actual : 0;
-        const nuevoStock = Number(stockActual) + Number(cantidad);
-
-        const queryStock = `
-          INSERT INTO stock (producto_id, cantidad_actual) VALUES (?, ?)
-          ON CONFLICT(producto_id) DO UPDATE SET cantidad_actual = ?
-        `;
-
-        db.run(queryStock, [producto_id, nuevoStock, nuevoStock], (errStockUpdate) => {
-          if (errStockUpdate) {
-            db.run('ROLLBACK;');
-            return res.status(500).json({ message: 'Error al actualizar el stock.' });
-          }
-
-          db.run('COMMIT;', () => {
-            res.status(201).json({ message: '¡Compra registrada y stock actualizado con éxito!' });
-          });
-        });
-      });
-    });
-  });
-});
-
-// 2. Obtener el historial de compras con detalles de producto y proveedor
 app.get('/api/compras', (req, res) => {
   const query = `
-    SELECT c.id, c.cantidad, c.precio_costo_unitario, c.fecha, 
+    SELECT d.id, d.cantidad, d.precio_costo_unitario, f.fecha, 
            p.nombre AS producto_nombre, 
            pr.nombre AS proveedor_nombre 
-    FROM compras c
-    LEFT JOIN productos p ON c.producto_id = p.id
-    LEFT JOIN proveedores pr ON c.proveedor_id = pr.id
-    ORDER BY c.fecha DESC
+    FROM detalle_compras d
+    JOIN facturas_compra f ON d.factura_id = f.id
+    LEFT JOIN productos p ON d.producto_id = p.id
+    LEFT JOIN proveedores pr ON f.proveedor_id = pr.id
+    ORDER BY f.fecha DESC
   `;
 
   db.all(query, [], (err, rows) => {
@@ -566,6 +785,38 @@ app.get('/api/compras', (req, res) => {
     res.json(rows);
   });
 });
+
+// 1. Obtener todas las facturas de compra
+app.get('/api/facturas-compra', (req, res) => {
+  const query = `
+    SELECT f.*, p.nombre AS proveedor_nombre 
+    FROM facturas_compra f
+    LEFT JOIN proveedores p ON f.proveedor_id = p.id
+    ORDER BY f.fecha DESC
+  `;
+  db.all(query, [], (err, rows) => {
+    if (err) return res.status(500).json({ message: 'Error al obtener las facturas.' });
+    res.json(rows);
+  });
+});
+
+// 2. Obtener los ítems/detalles de una factura específica
+app.get('/api/facturas-compra/:id/detalles', (req, res) => {
+  const { id } = req.params;
+  const query = `
+    SELECT d.*, p.nombre AS producto_nombre
+    FROM detalle_compras d
+    LEFT JOIN productos p ON d.producto_id = p.id
+    WHERE d.factura_id = ?
+  `;
+  db.all(query, [id], (err, rows) => {
+    if (err) return res.status(500).json({ message: 'Error al obtener el detalle de la factura.' });
+    res.json(rows);
+  });
+});
+
+
+
 
 // === INICIO DEL SERVIDOR (Siempre al final) ===
 app.listen(PORT, () => {

@@ -3,13 +3,19 @@ import { obtenerFechaActualISO } from '../utils/dataUtils';
 
 export default function History({ activeSection }) {
   const [compras, setCompras] = useState([]);
+  const [facturas, setFacturas] = useState([]);
   const [productos, setProductos] = useState([]);
   const [proveedores, setProveedores] = useState([]);
+
+  // Estado para el modal de detalle de una factura seleccionada
+  const [showFacturaModal, setShowFacturaModal] = useState(false);
+  const [facturaSeleccionada, setFacturaSeleccionada] = useState(null);
+  const [detallesFacturaModal, setDetallesFacturaModal] = useState([]);
 
   // Estado para desplegar compras de un mes en particular desde la vista anual
   const [mesDetalleSeleccionado, setMesDetalleSeleccionado] = useState(null);
 
-  // Estados para el nuevo formulario de FACTURA DE COMPRA ÚNICA (Carrito)
+  // Estados para el formulario de FACTURA DE COMPRA ÚNICA (Carrito)
   const [facturaHeader, setFacturaHeader] = useState({
     numero_factura: '',
     proveedor_id: '',
@@ -39,6 +45,18 @@ export default function History({ activeSection }) {
     }
   }, []);
 
+  const fetchFacturas = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:3001/api/facturas-compra');
+      if (res.ok) {
+        const data = await res.json();
+        setFacturas(data);
+      }
+    } catch {
+      setError('Error al cargar las facturas.');
+    }
+  }, []);
+
   const fetchProductosYProveedores = useCallback(async () => {
     try {
       const resProd = await fetch('http://localhost:3001/api/products');
@@ -53,8 +71,9 @@ export default function History({ activeSection }) {
 
   useEffect(() => {
     fetchCompras();
+    fetchFacturas();
     fetchProductosYProveedores();
-  }, [fetchCompras, fetchProductosYProveedores]);
+  }, [fetchCompras, fetchFacturas, fetchProductosYProveedores]);
 
   // Manejadores para la cabecera de la factura
   const handleHeaderChange = (e) => {
@@ -66,7 +85,6 @@ export default function History({ activeSection }) {
     const { name, value } = e.target;
     setItemActual({ ...itemActual, [name]: value });
 
-    // Si selecciona un producto, podemos precargar su costo por defecto si lo tuviera
     if (name === 'producto_id') {
       const prodSeleccionado = productos.find(p => p.id.toString() === value);
       if (prodSeleccionado) {
@@ -79,7 +97,6 @@ export default function History({ activeSection }) {
     }
   };
 
-  // Agregar producto a la lista temporal de la factura
   const handleAgregarItem = (e) => {
     e.preventDefault();
     if (!itemActual.producto_id || itemActual.cantidad <= 0 || itemActual.precio_costo_unitario < 0) {
@@ -99,20 +116,16 @@ export default function History({ activeSection }) {
     };
 
     setItemsFactura([...itemsFactura, nuevoItem]);
-    // Resetear input de ítem manteniendo la selección limpia
     setItemActual({ producto_id: '', cantidad: 1, precio_costo_unitario: 0 });
   };
 
-  // Remover ítem del carrito temporal
   const handleQuitarItem = (index) => {
     const nuevosItems = itemsFactura.filter((_, i) => i !== index);
     setItemsFactura(nuevosItems);
   };
 
-  // Total general de la factura en curso
   const totalGeneralFactura = itemsFactura.reduce((acc, item) => acc + item.subtotal, 0);
 
-  // Enviar factura completa al backend
   const handleSubmitFactura = async () => {
     setError('');
     setSuccess('');
@@ -155,6 +168,7 @@ export default function History({ activeSection }) {
         });
         setItemsFactura([]);
         fetchCompras();
+        fetchFacturas();
         fetchProductosYProveedores();
       } else {
         setError(data.message || 'Error al registrar la factura.');
@@ -162,6 +176,51 @@ export default function History({ activeSection }) {
     } catch {
       setError('Error de conexión con el servidor.');
     }
+  };
+
+  // Abrir modal con los detalles de una factura específica
+  const handleVerDetalleFactura = async (factura) => {
+    setFacturaSeleccionada(factura);
+    try {
+      const res = await fetch(`http://localhost:3001/api/facturas-compra/${factura.id}/detalles`);
+      if (res.ok) {
+        const data = await res.json();
+        setDetallesFacturaModal(data);
+        setShowFacturaModal(true);
+      }
+    } catch {
+      setError('Error al obtener el detalle de la factura.');
+    }
+  };
+
+  // Función para eliminar factura (Solo permitida si es del mes actual por seguridad)
+  const handleDeleteFactura = async (id) => {
+    if (!window.confirm('¿Seguro que deseas eliminar esta factura?')) return;
+    try {
+      const res = await fetch(`http://localhost:3001/api/facturas-compra/${id}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSuccess('¡Factura eliminada y stock revertido con éxito!');
+        fetchFacturas();
+        fetchCompras();
+      } else {
+        setError(data.message || 'Error al eliminar la factura.');
+      }
+    } catch {
+      setError('Error de conexión al eliminar.');
+    }
+  };
+
+  // Función para validar en React si una fecha corresponde al mes actual
+  const esMesActual = (fechaStr) => {
+    if (!fechaStr) return false;
+    const [anioF, mesF] = fechaStr.split('-');
+    const now = new Date();
+    const anioA = now.getFullYear().toString();
+    const mesA = (now.getMonth() + 1).toString().padStart(2, '0');
+    return anioF === anioA && mesF === mesA;
   };
 
   // Nombres de los meses y cálculos anuales
@@ -243,7 +302,6 @@ export default function History({ activeSection }) {
         <div className="dashboard-card-inner">
           <h3>Registrar Factura de Compra / Entrada de Stock</h3>
           
-          {/* Cabecera de la Factura */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginTop: '15px', marginBottom: '20px', background: '#f4f9fa', padding: '15px', borderRadius: '8px' }}>
             <div>
               <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold', color: '#0b2545' }}>Nº de Factura</label>
@@ -266,7 +324,6 @@ export default function History({ activeSection }) {
             </div>
           </div>
 
-          {/* Formulario para añadir ítems al carrito de la factura */}
           <form onSubmit={handleAgregarItem} style={{ background: '#fff', border: '1px solid #e1e8ed', padding: '15px', borderRadius: '8px', marginBottom: '20px' }}>
             <h4 style={{ margin: '0 0 10px 0', color: '#0b2545', fontSize: '15px' }}>Agregar Productos a la Factura</h4>
             
@@ -297,7 +354,6 @@ export default function History({ activeSection }) {
             </div>
           </form>
 
-          {/* Tabla de ítems cargados */}
           <h4 style={{ margin: '15px 0 10px 0', color: '#0b2545', fontSize: '15px' }}>Ítems en esta Factura</h4>
           <table>
             <thead>
@@ -332,7 +388,6 @@ export default function History({ activeSection }) {
             </tbody>
           </table>
 
-          {/* Total general y botón de confirmación */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', background: '#f4f9fa', padding: '15px', borderRadius: '8px' }}>
             <h3 style={{ margin: 0, color: '#0b2545' }}>Total Factura: ${totalGeneralFactura.toLocaleString()}</h3>
             
@@ -340,6 +395,67 @@ export default function History({ activeSection }) {
               Registrar Factura y Actualizar Stock
             </button>
           </div>
+        </div>
+      )}
+
+      {/* VISTA NUEVA: LISTADO GENERAL DE FACTURAS REGISTRADAS (Con candado de seguridad para meses pasados) */}
+      {activeSection === 'history-invoices' && (
+        <div className="dashboard-card-inner">
+          <h3>Listado General de Facturas de Compra</h3>
+          <p style={{ color: '#666', fontSize: '13px', marginBottom: '15px' }}>Consulta todas las facturas ingresadas al sistema y gestiona las del mes actual.</p>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Nº Factura</th>
+                <th>Proveedor</th>
+                <th>Fecha de Emisión</th>
+                <th>Total ($)</th>
+                <th style={{ textAlign: 'center' }}>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {facturas.length === 0 ? (
+                <tr>
+                  <td colSpan="5" style={{ textAlign: 'center', padding: '20px' }}>No hay facturas registradas.</td>
+                </tr>
+              ) : (
+                facturas.map((f) => {
+                  const editable = esMesActual(f.fecha);
+
+                  return (
+                    <tr key={f.id}>
+                      <td><strong>{f.numero_factura}</strong></td>
+                      <td>{f.proveedor_nombre || 'Sin proveedor asignado'}</td>
+                      <td>{f.fecha}</td>
+                      <td><strong>${f.total.toLocaleString()}</strong></td>
+                      <td style={{ textAlign: 'center', display: 'flex', gap: '5px', justifyContent: 'center' }}>
+                        <button 
+                          onClick={() => handleVerDetalleFactura(f)}
+                          style={{ background: '#00bcd4', color: '#0b2545', border: 'none', padding: '5px 12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}
+                        >
+                          Ver Detalle
+                        </button>
+
+                        {editable ? (
+                          <button 
+                            onClick={() => handleDeleteFactura(f.id)}
+                            style={{ background: '#e74c3c', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                          >
+                            Eliminar
+                          </button>
+                        ) : (
+                          <span title="Bloqueado por seguridad: Corresponde a un periodo anterior cerrado" style={{ fontSize: '12px', color: '#e74c3c', cursor: 'not-allowed', alignSelf: 'center', fontWeight: 'bold', padding: '0 5px' }}>
+                            🔒 Cerrado
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -385,7 +501,6 @@ export default function History({ activeSection }) {
       {activeSection === 'history-annual' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
-          {/* BLOQUE SUPERIOR: INDICADORES CLAVE (KPIs) */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '15px' }}>
             <div className="dashboard-card-inner" style={{ textAlign: 'center', borderLeft: '5px solid #00bcd4' }}>
               <span style={{ fontSize: '12px', color: '#666', fontWeight: 'bold' }}>INVERSIÓN TOTAL ANUAL</span>
@@ -408,7 +523,6 @@ export default function History({ activeSection }) {
             </div>
           </div>
 
-          {/* TABLA PRINCIPAL: RESUMEN MES A MES */}
           <div className="dashboard-card-inner">
             <h3>Resumen de Compras por Mes ({anioActual})</h3>
             
@@ -447,7 +561,6 @@ export default function History({ activeSection }) {
             </table>
           </div>
 
-          {/* DESPLEGABLE DINÁMICO DE DETALLE AL HACER CLIC EN UN MES */}
           {mesDetalleSeleccionado && (
             <div className="dashboard-card-inner" style={{ border: '2px solid #00bcd4' }}>
               <h4 style={{ margin: '0 0 15px 0', color: '#0b2545' }}>
@@ -482,7 +595,6 @@ export default function History({ activeSection }) {
             </div>
           )}
 
-          {/* PANEL INFERIOR: TOP 5 PRODUCTOS MÁS ADQUIRIDOS */}
           <div className="dashboard-card-inner">
             <h3>Top 5 Productos Más Adquiridos del Año</h3>
             {top5Productos.length === 0 ? (
@@ -501,6 +613,62 @@ export default function History({ activeSection }) {
             )}
           </div>
 
+        </div>
+      )}
+
+      {/* POP-UP / MODAL PARA VER EL DETALLE DE ÍTEMS DE LA FACTURA SELECCIONADA */}
+      {showFacturaModal && facturaSeleccionada && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+          backgroundColor: 'rgba(11, 37, 69, 0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: '1000'
+        }}>
+          <div style={{
+            background: '#ffffff', padding: '30px', borderRadius: '10px', width: '100%', maxWidth: '650px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.15)', borderTop: '6px solid #00bcd4', maxHeight: '90vh', overflowY: 'auto'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+              <div>
+                <h3 style={{ margin: 0, color: '#0b2545', fontSize: '18px' }}>Factura: {facturaSeleccionada.numero_factura}</h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#555' }}>
+                  Proveedor: <strong>{facturaSeleccionada.proveedor_nombre || 'Sin proveedor'}</strong> | Fecha: <strong>{facturaSeleccionada.fecha}</strong>
+                </p>
+              </div>
+              <button onClick={() => setShowFacturaModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold', color: '#666' }}>✕</button>
+            </div>
+
+            <h4 style={{ margin: '15px 0 10px 0', color: '#0b2545', fontSize: '14px' }}>Productos Incluidos en la Factura</h4>
+            <table>
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Cantidad</th>
+                  <th>Costo Unit.</th>
+                  <th>Subtotal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {detallesFacturaModal.map((detalle, idx) => (
+                  <tr key={idx}>
+                    <td>{detalle.producto_nombre || 'Producto desconocido'}</td>
+                    <td>{detalle.cantidad} u.</td>
+                    <td>${Number(detalle.precio_costo_unitario).toLocaleString()}</td>
+                    <td><strong>${(detalle.cantidad * detalle.precio_costo_unitario).toLocaleString()}</strong></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', background: '#f4f9fa', padding: '12px', borderRadius: '6px' }}>
+              <span style={{ fontWeight: 'bold', color: '#0b2545' }}>Total de la Factura:</span>
+              <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#00bcd4' }}>${facturaSeleccionada.total.toLocaleString()}</span>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+              <button onClick={() => setShowFacturaModal(false)} style={{ background: '#0b2545', color: '#fff', border: 'none', padding: '8px 20px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>
+                Cerrar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
