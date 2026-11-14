@@ -519,9 +519,9 @@ const obtenerEstacionServidor = () => {
   return 'REGULAR';
 };
 
-// === MÓDULO DE PRODUCTOS CON ALERTAS ESTACIONALES ===
+// === MÓDULO DE PRODUCTOS (Refactorizado: Sin stock inicial manual) ===
 
-// 1. Obtener todos los productos con su umbral dinámico
+// 1. Obtener todos los productos (con su stock actual y umbral vigente)
 app.get('/api/products', (req, res) => {
   const estacionActual = obtenerEstacionServidor();
 
@@ -554,7 +554,7 @@ app.get('/api/products', (req, res) => {
   });
 });
 
-// 2. Añadir un nuevo producto y registrar sus umbrales estacionales
+// 2. Añadir un nuevo producto (Stock inicia en 0 por defecto)
 app.post('/api/products', (req, res) => {
   const {
     codigo_barras,
@@ -564,7 +564,6 @@ app.post('/api/products', (req, res) => {
     categoria_id,
     proveedor_id,
     temporada_alta,
-    stock,
     stock_minimo,
     stock_deseado
   } = req.body;
@@ -594,12 +593,14 @@ app.post('/api/products', (req, res) => {
         }
 
         const prodId = this.lastID;
-        const queryStock = `INSERT INTO stock (producto_id, cantidad_actual) VALUES (?, ?)`;
+        
+        // Inicializar stock en 0 obligatoriamente
+        const queryStock = `INSERT INTO stock (producto_id, cantidad_actual) VALUES (?, 0)`;
 
-        db.run(queryStock, [prodId, stock || 0], (errStock) => {
+        db.run(queryStock, [prodId], (errStock) => {
           if (errStock) {
             db.run('ROLLBACK;');
-            return res.status(500).json({ message: 'Error al registrar el stock inicial' });
+            return res.status(500).json({ message: 'Error al inicializar el stock' });
           }
 
           const tempObjetivo = temporada_alta === 'TODA_TEMP' ? 'REGULAR' : (temporada_alta || 'REGULAR');
@@ -619,7 +620,7 @@ app.post('/api/products', (req, res) => {
             }
 
             db.run('COMMIT;', () => {
-              res.status(201).json({ id: prodId, message: 'Producto y alerta estacional creados con éxito' });
+              res.status(201).json({ id: prodId, message: 'Producto creado con éxito en el catálogo' });
             });
           });
         });
@@ -628,7 +629,7 @@ app.post('/api/products', (req, res) => {
   });
 });
 
-// 3. Actualizar un producto y su umbral estacional vigente
+// 3. Actualizar datos del producto (Ya no modifica stock directamente)
 app.put('/api/products/:id', (req, res) => {
   const { id } = req.params;
   const {
@@ -639,7 +640,6 @@ app.put('/api/products/:id', (req, res) => {
     categoria_id,
     proveedor_id,
     temporada_alta,
-    stock,
     stock_minimo,
     stock_deseado
   } = req.body;
@@ -659,44 +659,32 @@ app.put('/api/products/:id', (req, res) => {
         return res.status(500).json({ message: 'Error al actualizar el producto' });
       }
 
-      const queryStock = `
-        INSERT INTO stock (producto_id, cantidad_actual) VALUES (?, ?)
-        ON CONFLICT(producto_id) DO UPDATE SET cantidad_actual = ?
-      `;
+      if (stock_minimo !== undefined && stock_minimo !== '') {
+        const tempObjetivo = temporada_alta === 'TODA_TEMP' ? 'REGULAR' : (temporada_alta || 'REGULAR');
+        const minVal = Number(stock_minimo);
+        const desVal = stock_deseado !== undefined && stock_deseado !== '' ? Number(stock_deseado) : 20;
 
-      db.run(queryStock, [id, stock || 0, stock || 0], (errStock) => {
-        if (errStock) {
-          db.run('ROLLBACK;');
-          return res.status(500).json({ message: 'Error al actualizar el stock' });
-        }
+        const queryAttr = `
+          INSERT INTO atributos_estacionales (producto_id, temporada, stock_minimo, stock_deseado)
+          VALUES (?, ?, ?, ?)
+          ON CONFLICT(producto_id, temporada) DO UPDATE SET stock_minimo = ?, stock_deseado = ?
+        `;
 
-        if (stock_minimo !== undefined && stock_minimo !== '') {
-          const tempObjetivo = temporada_alta === 'TODA_TEMP' ? 'REGULAR' : (temporada_alta || 'REGULAR');
-          const minVal = Number(stock_minimo);
-          const desVal = stock_deseado !== undefined && stock_deseado !== '' ? Number(stock_deseado) : 20;
+        db.run(queryAttr, [id, tempObjetivo, minVal, desVal, minVal, desVal], (errAttr) => {
+          if (errAttr) {
+            db.run('ROLLBACK;');
+            return res.status(500).json({ message: 'Error al actualizar alerta estacional' });
+          }
 
-          const queryAttr = `
-            INSERT INTO atributos_estacionales (producto_id, temporada, stock_minimo, stock_deseado)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(producto_id, temporada) DO UPDATE SET stock_minimo = ?, stock_deseado = ?
-          `;
-
-          db.run(queryAttr, [id, tempObjetivo, minVal, desVal, minVal, desVal], (errAttr) => {
-            if (errAttr) {
-              db.run('ROLLBACK;');
-              return res.status(500).json({ message: 'Error al actualizar alerta estacional' });
-            }
-
-            db.run('COMMIT;', () => {
-              res.json({ message: 'Producto y umbral estacional actualizados correctamente' });
-            });
-          });
-        } else {
           db.run('COMMIT;', () => {
             res.json({ message: 'Producto actualizado correctamente' });
           });
-        }
-      });
+        });
+      } else {
+        db.run('COMMIT;', () => {
+          res.json({ message: 'Producto actualizado correctamente' });
+        });
+      }
     });
   });
 });

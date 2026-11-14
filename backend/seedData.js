@@ -1,37 +1,34 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
-const dbPath = path.resolve(__dirname, 'kiosco.db');
-const db = new sqlite3.Database(dbPath);
+const db = new sqlite3.Database(path.resolve(__dirname, 'kiosco.db'));
 
 db.serialize(() => {
   db.run("PRAGMA foreign_keys = ON;");
+  db.run("BEGIN TRANSACTION;");
 
-  console.log('Insertando datos de prueba...');
-
-  // 1. Insertar Categorías
-  db.run(`INSERT OR IGNORE INTO categorias (nombre) VALUES ('Bebidas'), ('Infusiones')`);
-
-  // 2. Insertar Proveedor
-  db.run(`INSERT OR IGNORE INTO proveedores (nombre, telefono, email) VALUES ('Distribuidora Concordia', '3451234567', 'ventas@distconcordia.com')`);
-
-  // 3. Insertar Producto (Coca Cola 500ml - Verano)
   db.run(`
-    INSERT OR IGNORE INTO productos (codigo_barras, nombre, precio_costo, precio_venta, categoria_id, proveedor_id, temporada_alta)
-    VALUES ('779123456789', 'Coca Cola 500ml', 800.0, 1200.0, 1, 1, 'VERANO')
-  `, function(err) {
-    if (err) return console.error(err.message);
-    const prodId = this.lastID;
+    INSERT INTO facturas_compra (proveedor_id, numero_factura, fecha, total)
+    VALUES 
+      ((SELECT id FROM proveedores LIMIT 1), 'A-0001-0000102', '2026-08-14', 450000),
+      ((SELECT id FROM proveedores LIMIT 1), 'A-0001-0000215', '2026-09-20', 820000),
+      ((SELECT id FROM proveedores LIMIT 1), 'B-0002-0000389', '2026-10-10', 610000);
+  `);
 
-    if (prodId) {
-      // Stock actual
-      db.run(`INSERT INTO stock (producto_id, cantidad_actual) VALUES (${prodId}, 15)`);
-      
-      // Reglas estacionales para el producto
-      db.run(`INSERT INTO atributos_estacionales (producto_id, temporada, stock_minimo, stock_deseado) VALUES (${prodId}, 'VERANO', 24, 60)`);
-      db.run(`INSERT INTO atributos_estacionales (producto_id, temporada, stock_minimo, stock_deseado) VALUES (${prodId}, 'INVIERNO', 6, 20)`);
-    }
+  db.run(`
+    INSERT INTO detalle_compras (factura_id, producto_id, cantidad, precio_costo_unitario)
+    VALUES 
+      ((SELECT id FROM facturas_compra WHERE numero_factura = 'A-0001-0000102'), (SELECT id FROM productos LIMIT 1), 150, 3000),
+      ((SELECT id FROM facturas_compra WHERE numero_factura = 'A-0001-0000215'), (SELECT id FROM productos LIMIT 1 OFFSET 1), 410, 2000),
+      ((SELECT id FROM facturas_compra WHERE numero_factura = 'B-0002-0000389'), (SELECT id FROM productos LIMIT 1), 200, 3050);
+  `);
+
+  db.run("COMMIT;", (err) => {
+    if (err) console.error("Error al insertar:", err.message);
+    else console.log("¡Facturas históricas cargadas con éxito!");
+    db.close();
   });
+
 
   console.log('¡Carga de datos dummy finalizada!');
 });

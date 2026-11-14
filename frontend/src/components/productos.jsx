@@ -18,17 +18,16 @@ export default function Products({ activeSection }) {
   const [editingCatNombre, setEditingCatNombre] = useState('');
 
   // Formulario exclusivo para AÑADIR producto
-  const [form, setForm] = useState({
-      codigo_barras: '',
-      nombre: '',
-      precio_costo: 0,
-      precio_venta: 0,
-      categoria_id: '',
-      proveedor_id: '',
-      temporada_alta: 'TODA_TEMP',
-      stock: 0,
-      stock_minimo: 5
-    });
+const [form, setForm] = useState({
+    codigo_barras: '',
+    nombre: '',
+    precio_costo: 0,
+    precio_venta: 0,
+    categoria_id: '',
+    proveedor_id: '',
+    temporada_alta: 'TODA_TEMP',
+    stock_minimo: 5
+  });
 
   // Estados exclusivos para el MODAL DE EDICIÓN de producto
   const [showEditModal, setShowEditModal] = useState(false);
@@ -348,14 +347,9 @@ const handleOpenEditModal = (product) => {
                 </select>
               </div>
 
+
+
               <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold', color: '#0b2545' }}>Stock Inicial</label>
-                <input type="number" name="stock" placeholder="Cantidad inicial en estantería" value={form.stock} onChange={handleInputChange} required style={{ width: '100%' }} />
-              </div>
-            </div>
-
-
-              <div className="form-group">
                 <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold', color: '#0b2545' }}>
                   Stock Mínimo (Alerta Estacional)
                 </label>
@@ -366,13 +360,15 @@ const handleOpenEditModal = (product) => {
                   value={form.stock_minimo}
                   onChange={handleInputChange}
                   required
-                  style={{ width: '100%' }}
+                  style={{ width: '100%', padding: '8px' }}
                 />
               </div>
             
             <button type="submit" className="btn-guardar">
               Guardar Producto
-            </button>
+              </button>
+              
+              </div>
           </form>
 
           {/* POP-UP NUEVA CATEGORÍA */}
@@ -583,10 +579,6 @@ const handleOpenEditModal = (product) => {
                   </select>
                 </div>
 
-                <div className="form-group">
-                  <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold', color: '#0b2545' }}>Stock Actual</label>
-                  <input type="number" name="stock" value={editForm.stock} onChange={handleEditInputChange} required style={{ width: '100%', padding: '8px' }} />
-                </div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>

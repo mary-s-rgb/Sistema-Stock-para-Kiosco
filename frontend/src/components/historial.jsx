@@ -30,6 +30,12 @@ export default function History({ activeSection }) {
 
   const [itemsFactura, setItemsFactura] = useState([]);
 
+  //filtro busqueda
+  // Estados para el buscador escalable de productos en la factura
+  const [busquedaProducto, setBusquedaProducto] = useState('');
+  const [mostrarSugerencias, setMostrarSugerencias] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -223,7 +229,7 @@ export default function History({ activeSection }) {
     return anioF === anioA && mesF === mesA;
   };
 
-  // Nombres de los meses y cálculos anuales
+  // Nombres de los meses y cálculos anuales basados en FACTURAS
   const nombresMeses = [
     'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
@@ -233,13 +239,12 @@ export default function History({ activeSection }) {
   const anioActual = fechaActualObj.getFullYear().toString();
   const mesActualNum = (fechaActualObj.getMonth() + 1).toString().padStart(2, '0');
 
-  const comprasDelAnio = compras.filter((c) => {
-    if (!c.fecha) return false;
-    return c.fecha.split('-')[0] === anioActual;
+  const facturasDelAnio = facturas.filter((f) => {
+    if (!f.fecha) return false;
+    return f.fecha.split('-')[0] === anioActual;
   });
 
   let gastoTotalAnual = 0;
-  let unidadesTotalesAnual = 0;
   const mesesMap = {};
   const productosMap = {};
 
@@ -249,24 +254,27 @@ export default function History({ activeSection }) {
       numMes: key,
       nombreMes: nombresMeses[i - 1],
       operaciones: 0,
-      unidades: 0,
-      totalGasto: 0
+      totalGasto: 0,
+      facturasMes: []
     };
   }
 
-  comprasDelAnio.forEach((c) => {
-    const [, mes] = c.fecha.split('-');
-    const costoSubtotal = Number(c.cantidad) * Number(c.precio_costo_unitario);
+  facturasDelAnio.forEach((f) => {
+    const [, mes] = f.fecha.split('-');
+    const montoFactura = Number(f.total);
 
-    gastoTotalAnual += costoSubtotal;
-    unidadesTotalesAnual += Number(c.cantidad);
+    gastoTotalAnual += montoFactura;
 
     if (mesesMap[mes]) {
       mesesMap[mes].operaciones += 1;
-      mesesMap[mes].unidades += Number(c.cantidad);
-      mesesMap[mes].totalGasto += costoSubtotal;
+      mesesMap[mes].totalGasto += montoFactura;
+      mesesMap[mes].facturasMes.push(f);
     }
+  });
 
+  // Para el Top 5 de productos, seguimos usando el array detallado de compras
+  compras.forEach((c) => {
+    const costoSubtotal = Number(c.cantidad) * Number(c.precio_costo_unitario);
     const prodNombre = c.producto_nombre || 'Producto Desconocido';
     if (!productosMap[prodNombre]) {
       productosMap[prodNombre] = { nombre: prodNombre, unidades: 0, totalGasto: 0 };
@@ -286,11 +294,33 @@ export default function History({ activeSection }) {
     .sort((a, b) => b.unidades - a.unidades)
     .slice(0, 5);
 
-  const comprasMensuales = compras.filter((c) => {
-    if (!c.fecha) return false;
-    const [anio, mes] = c.fecha.split('-');
+  const facturasMensuales = facturas.filter((f) => {
+    if (!f.fecha) return false;
+    const [anio, mes] = f.fecha.split('-');
     return anio === anioActual && mes === mesActualNum;
   });
+
+  // Filtrar productos por nombre o código de barras mientras el usuario escribe
+  const productosFiltradosFactura = busquedaProducto.trim() === ''
+    ? []
+    : productos.filter((p) => {
+        const term = busquedaProducto.toLowerCase();
+        return (
+          (p.nombre && p.nombre.toLowerCase().includes(term)) ||
+          (p.codigo_barras && p.codigo_barras.toLowerCase().includes(term))
+        );
+      });
+
+  // Seleccionar un producto de la lista de resultados
+  const handleSeleccionarProductoFactura = (prod) => {
+    setItemActual({
+      ...itemActual,
+      producto_id: prod.id.toString(),
+      precio_costo_unitario: prod.precio_costo || 0
+    });
+    setBusquedaProducto(`${prod.nombre} (${prod.codigo_barras})`);
+    setMostrarSugerencias(false);
+  };
 
   return (
     <div>
@@ -330,12 +360,90 @@ export default function History({ activeSection }) {
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '10px', alignItems: 'end' }}>
               <div>
                 <label style={{ display: 'block', marginBottom: '3px', fontSize: '12px', fontWeight: 'bold', color: '#555' }}>Producto</label>
-                <select name="producto_id" value={itemActual.producto_id} onChange={handleItemChange} style={{ width: '100%', padding: '8px' }}>
-                  <option value="">Seleccione producto...</option>
-                  {productos.map((p) => (
-                    <option key={p.id} value={p.id}>{p.nombre} (Stock actual: {p.stock})</option>
-                  ))}
-                </select>
+                  <div style={{ position: 'relative' }}>
+                  <label style={{ display: 'block', marginBottom: '3px', fontSize: '12px', fontWeight: 'bold', color: '#555' }}>
+                    Buscar Producto (Nombre o Código)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Escribe nombre o escanea código..."
+                    value={busquedaProducto}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setBusquedaProducto(val);
+                      setMostrarSugerencias(true);
+                      // Si borra el texto, limpiamos el producto seleccionado
+                      if (val.trim() === '') {
+                        setItemActual({ ...itemActual, producto_id: '', precio_costo_unitario: 0 });
+                      }
+                      // Soporte directo para lector de código de barras (coincidencia exacta)
+                      const exacto = productos.find(
+                        (p) => p.codigo_barras && p.codigo_barras.toLowerCase() === val.trim().toLowerCase()
+                      );
+                      if (exacto) {
+                        handleSeleccionarProductoFactura(exacto);
+                      }
+                    }}
+                    onFocus={() => setMostrarSugerencias(true)}
+                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
+                  />
+
+                  {/* Lista flotante de coincidencias */}
+                  {mostrarSugerencias && busquedaProducto.trim() !== '' && !itemActual.producto_id && (
+                    <ul
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        background: '#ffffff',
+                        border: '1px solid #00bcd4',
+                        borderRadius: '0 0 6px 6px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                        maxHeight: '220px',
+                        overflowY: 'auto',
+                        listStyle: 'none',
+                        margin: 0,
+                        padding: 0,
+                        zIndex: 50
+                      }}
+                    >
+                      {productosFiltradosFactura.length === 0 ? (
+                        <li style={{ padding: '10px', fontSize: '13px', color: '#64748b' }}>
+                          No se encontraron productos coincidentes.
+                        </li>
+                      ) : (
+                        productosFiltradosFactura.map((p) => (
+                          <li
+                            key={p.id}
+                            onClick={() => handleSeleccionarProductoFactura(p)}
+                            style={{
+                              padding: '8px 12px',
+                              cursor: 'pointer',
+                              borderBottom: '1px solid #f1f5f9',
+                              fontSize: '13px',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center'
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = '#e0f7fa')}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = '#ffffff')}
+                          >
+                            <div>
+                              <strong style={{ color: '#0b2545' }}>{p.nombre}</strong>
+                              <span style={{ display: 'block', fontSize: '11px', color: '#64748b' }}>
+                                Cód: {p.codigo_barras}
+                              </span>
+                            </div>
+                            <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#00838f' }}>
+                              Stock: {p.stock} u.
+                            </span>
+                          </li>
+                        ))
+                      )}
+                    </ul>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -398,7 +506,7 @@ export default function History({ activeSection }) {
         </div>
       )}
 
-      {/* VISTA NUEVA: LISTADO GENERAL DE FACTURAS REGISTRADAS (Con candado de seguridad para meses pasados) */}
+      {/* VISTA NUEVA: LISTADO GENERAL DE FACTURAS REGISTRADAS */}
       {activeSection === 'history-invoices' && (
         <div className="dashboard-card-inner">
           <h3>Listado General de Facturas de Compra</h3>
@@ -459,36 +567,42 @@ export default function History({ activeSection }) {
         </div>
       )}
 
-      {/* VISTA 2: HISTORIAL MENSUAL ESTÁNDAR */}
+      {/* VISTA 2: HISTORIAL MENSUAL BASADO EN FACTURAS */}
       {activeSection === 'history-monthly' && (
         <div className="dashboard-card-inner">
-          <h3>Historial de Compras del Mes ({nombresMeses[parseInt(mesActualNum, 10) - 1]} {anioActual})</h3>
+          <h3>Historial de Facturas del Mes ({nombresMeses[parseInt(mesActualNum, 10) - 1]} {anioActual})</h3>
+          <p style={{ color: '#666', fontSize: '13px', marginBottom: '15px' }}>Resumen de facturas de compra registradas en el mes en curso.</p>
           
           <table>
             <thead>
               <tr>
+                <th>Nº Factura</th>
                 <th>Fecha</th>
-                <th>Producto</th>
                 <th>Proveedor</th>
-                <th>Cantidad</th>
-                <th>Costo Unit.</th>
-                <th>Total</th>
+                <th>Total Abonado</th>
+                <th style={{ textAlign: 'center' }}>Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {comprasMensuales.length === 0 ? (
+              {facturasMensuales.length === 0 ? (
                 <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', padding: '20px' }}>No hay registros de compras en este mes.</td>
+                  <td colSpan="5" style={{ textAlign: 'center', padding: '20px' }}>No hay registros de facturas en este mes.</td>
                 </tr>
               ) : (
-                comprasMensuales.map((c) => (
-                  <tr key={c.id}>
-                    <td>{c.fecha}</td>
-                    <td>{c.producto_nombre || 'Producto desconocido'}</td>
-                    <td>{c.proveedor_nombre || 'Sin proveedor'}</td>
-                    <td>{c.cantidad}</td>
-                    <td>${Number(c.precio_costo_unitario).toLocaleString()}</td>
-                    <td>${(c.cantidad * c.precio_costo_unitario).toLocaleString()}</td>
+                facturasMensuales.map((f) => (
+                  <tr key={f.id}>
+                    <td><strong>{f.numero_factura}</strong></td>
+                    <td>{f.fecha}</td>
+                    <td>{f.proveedor_nombre || 'Sin proveedor'}</td>
+                    <td><strong>${f.total.toLocaleString()}</strong></td>
+                    <td style={{ textAlign: 'center' }}>
+                      <button 
+                        onClick={() => handleVerDetalleFactura(f)}
+                        style={{ background: '#00bcd4', color: '#0b2545', border: 'none', padding: '5px 12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}
+                      >
+                        Ver Detalle
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -497,7 +611,7 @@ export default function History({ activeSection }) {
         </div>
       )}
 
-      {/* VISTA 3: RESUMEN ANUAL ESCALABLE (KPIs + Tabla por Mes + Top 5) */}
+      {/* VISTA 3: RESUMEN ANUAL ESCALABLE (KPIs + Tabla por Mes de Facturas + Top 5) */}
       {activeSection === 'history-annual' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
@@ -508,8 +622,8 @@ export default function History({ activeSection }) {
             </div>
 
             <div className="dashboard-card-inner" style={{ textAlign: 'center', borderLeft: '5px solid #00bcd4' }}>
-              <span style={{ fontSize: '12px', color: '#666', fontWeight: 'bold' }}>UNIDADES INGRESADAS</span>
-              <h2 style={{ margin: '8px 0 0', color: '#0b2545', fontSize: '22px' }}>{unidadesTotalesAnual.toLocaleString()} u.</h2>
+              <span style={{ fontSize: '12px', color: '#666', fontWeight: 'bold' }}>FACTURAS REGISTRADAS</span>
+              <h2 style={{ margin: '8px 0 0', color: '#0b2545', fontSize: '22px' }}>{facturasDelAnio.length} op.</h2>
             </div>
 
             <div className="dashboard-card-inner" style={{ textAlign: 'center', borderLeft: '5px solid #00bcd4' }}>
@@ -524,14 +638,13 @@ export default function History({ activeSection }) {
           </div>
 
           <div className="dashboard-card-inner">
-            <h3>Resumen de Compras por Mes ({anioActual})</h3>
+            <h3>Resumen de Facturas por Mes ({anioActual})</h3>
             
             <table>
               <thead>
                 <tr>
                   <th>Mes</th>
-                  <th>Compras Realizadas</th>
-                  <th>Unidades Compradas</th>
+                  <th>Facturas Registradas</th>
                   <th>Inversión Total ($)</th>
                   <th>Acciones</th>
                 </tr>
@@ -540,8 +653,7 @@ export default function History({ activeSection }) {
                 {Object.values(mesesMap).map((m) => (
                   <tr key={m.numMes} style={{ backgroundColor: m.totalGasto > 0 ? '#fcfcfc' : 'transparent' }}>
                     <td><strong>{m.nombreMes}</strong></td>
-                    <td>{m.operaciones} reg.</td>
-                    <td>{m.unidades} u.</td>
+                    <td>{m.operaciones} factura(s)</td>
                     <td><strong>${m.totalGasto.toLocaleString()}</strong></td>
                     <td>
                       {m.operaciones > 0 ? (
@@ -549,7 +661,7 @@ export default function History({ activeSection }) {
                           onClick={() => setMesDetalleSeleccionado(mesDetalleSeleccionado === m.numMes ? null : m.numMes)}
                           style={{ background: '#00bcd4', color: '#0b2545', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}
                         >
-                          {mesDetalleSeleccionado === m.numMes ? 'Ocultar Detalle' : 'Ver Detalle'}
+                          {mesDetalleSeleccionado === m.numMes ? 'Ocultar Facturas' : 'Ver Facturas'}
                         </button>
                       ) : (
                         <span style={{ color: '#aaa', fontSize: '12px' }}>Sin registros</span>
@@ -564,32 +676,35 @@ export default function History({ activeSection }) {
           {mesDetalleSeleccionado && (
             <div className="dashboard-card-inner" style={{ border: '2px solid #00bcd4' }}>
               <h4 style={{ margin: '0 0 15px 0', color: '#0b2545' }}>
-                Detalle de Operaciones de {nombresMeses[parseInt(mesDetalleSeleccionado, 10) - 1]}
+                Facturas Registradas en {nombresMeses[parseInt(mesDetalleSeleccionado, 10) - 1]}
               </h4>
               <table>
                 <thead>
                   <tr>
+                    <th>Nº Factura</th>
                     <th>Fecha</th>
-                    <th>Producto</th>
                     <th>Proveedor</th>
-                    <th>Cantidad</th>
-                    <th>Costo Unit.</th>
-                    <th>Total</th>
+                    <th>Total Abonado</th>
+                    <th style={{ textAlign: 'center' }}>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {comprasDelAnio
-                    .filter((c) => c.fecha.split('-')[1] === mesDetalleSeleccionado)
-                    .map((c) => (
-                      <tr key={c.id}>
-                        <td>{c.fecha}</td>
-                        <td>{c.producto_nombre}</td>
-                        <td>{c.proveedor_nombre || 'Sin proveedor'}</td>
-                        <td>{c.cantidad}</td>
-                        <td>${Number(c.precio_costo_unitario).toLocaleString()}</td>
-                        <td>${(c.cantidad * c.precio_costo_unitario).toLocaleString()}</td>
-                      </tr>
-                    ))}
+                  {mesesMap[mesDetalleSeleccionado].facturasMes.map((f) => (
+                    <tr key={f.id}>
+                      <td><strong>{f.numero_factura}</strong></td>
+                      <td>{f.fecha}</td>
+                      <td>{f.proveedor_nombre || 'Sin proveedor'}</td>
+                      <td><strong>${f.total.toLocaleString()}</strong></td>
+                      <td style={{ textAlign: 'center' }}>
+                        <button 
+                          onClick={() => handleVerDetalleFactura(f)}
+                          style={{ background: '#00bcd4', color: '#0b2545', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}
+                        >
+                          Ver Detalle
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -640,7 +755,7 @@ export default function History({ activeSection }) {
             <table>
               <thead>
                 <tr>
-                  <th>Producto</th>
+                  <th>Nº Factura / Ítem</th>
                   <th>Cantidad</th>
                   <th>Costo Unit.</th>
                   <th>Subtotal</th>
