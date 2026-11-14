@@ -530,10 +530,7 @@ const handleOpenEditModal = (product) => {
 
             <form onSubmit={handleUpdateProduct}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
-                <div className="form-group">
-                  <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold', color: '#0b2545' }}>Código de Barras</label>
-                  <input type="text" name="codigo_barras" value={editForm.codigo_barras} onChange={handleEditInputChange} required style={{ width: '100%', padding: '8px' }} />
-                </div>
+               
 
                 <div className="form-group">
                   <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold', color: '#0b2545' }}>Nombre del Producto</label>
