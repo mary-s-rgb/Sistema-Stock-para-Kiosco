@@ -38,8 +38,6 @@ El sistema cuenta con control de acceso mediante credenciales fijando niveles de
 * **Categorización Estacional:** Etiquetas de comportamiento por producto (`Alta - Verano`, `Alta - Invierno`, `Atemporal` para golosinas/cigarrillos).
 * **Parámetros Dinámicos por Temporada:** Configuración independiente de stock mínimo, máximo y punto de reorden según la estación activa.
 * **Control de Temporada (Modo Calendario / Manual):** Cambios automáticos por fecha predefinida o activación manual inmediata ante variaciones del clima.
-* **Sugeridor Inteligente de Órdenes de Compra:** Generación automática de listas de pedido ajustadas multiplicando el promedio de venta diaria por el tiempo de entrega e incrementado por el factor estacional (1.5x - 2x).
-* **Alertas Proactivas de Transición:** Avisos previos al cambio de estación para rematar stock saliente (evitar stock reposado) o anticipar la compra de la temporada entrante.
 * **Reportes Históricos Comparativos:** Gráficos interanuales (ej. *Enero 2025 vs. Enero 2026*) para tomar decisiones comerciales basadas en datos reales.
 
 ---
