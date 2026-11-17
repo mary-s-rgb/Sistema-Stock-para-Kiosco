@@ -516,8 +516,10 @@ const obtenerEstacionServidor = () => {
   const mes = new Date().getMonth() + 1; // 1 a 12
   if (mes === 12 || mes === 1 || mes === 2) return 'VERANO';
   if (mes >= 6 && mes <= 8) return 'INVIERNO';
-  return 'REGULAR';
+//  return 'REGULAR';
+  return 'INVIERNO';    // Forzar invierno
 };
+
 
 // === MÓDULO DE PRODUCTOS (Refactorizado: Sin stock inicial manual) ===
 

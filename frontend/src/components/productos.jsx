@@ -480,20 +480,33 @@ const handleOpenEditModal = (product) => {
                     <td colSpan="8" style={{ textAlign: 'center', padding: '20px' }}>No se encontraron productos coincidentes.</td>
                   </tr>
                 ) : (
-                    filteredProducts.map((p) => {
+filteredProducts.map((p) => {
                       const umbralAlerta = p.stock_minimo_vigente ?? 5;
-                      const isLowStock = p.stock <= umbralAlerta;
+                      
+                      // 1. Validar si el producto está en su temporada activa
+                      const estacionActivaServidor = p.estacion_actual || estacionActual;
+                      const esTemporadaActiva = p.temporada_alta === 'TODA_TEMP' || p.temporada_alta === estacionActivaServidor;
+
+                      // 2. La alerta roja de stock bajo SOLO salta si está en temporada activa y el stock es menor al mínimo
+                      const isLowStock = esTemporadaActiva && p.stock <= umbralAlerta;
 
                       return (
                         <tr key={p.id}>
                           <td>{p.nombre}</td>
                           <td>{p.categoria_nombre || 'Sin categoría'}</td>
                           <td style={{ color: isLowStock ? '#e74c3c' : 'inherit', fontWeight: isLowStock ? 'bold' : 'normal' }}>
-                            {p.stock} {isLowStock && (
-                              <span title={`Alerta (${p.estacion_actual || estacionActual}): Stock actual (${p.stock}) por debajo del mínimo configurado (${umbralAlerta} u.)`}>
+                            {p.stock} {isLowStock ? (
+                              <span title={`Alerta (${estacionActivaServidor}): Stock actual (${p.stock}) por debajo del mínimo configurado (${umbralAlerta} u.)`}>
                                 ⚠️
                               </span>
-                            )}
+                            ) : (!esTemporadaActiva && (
+                              <span 
+                                title={`Producto fuera de temporada (Su temporada alta es: ${p.temporada_alta}). No requiere reposición urgente.`} 
+                                style={{ display: 'block', fontSize: '11px', color: '#64748b', fontStyle: 'italic', marginTop: '2px' }}
+                              >
+                                🏖️ 
+                              </span>
+                            ))}
                           </td>
                           <td>${p.precio_costo}</td>
                           <td>${p.precio_venta}</td>
